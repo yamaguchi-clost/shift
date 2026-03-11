@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>出勤希望フォーム</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Noto Sans JP', sans-serif; }
+    body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+    .card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); max-width: 500px; margin: 0 auto; }
+    .btn { padding: 12px 24px; border-radius: 12px; font-weight: bold; cursor: pointer; border: none; width: 100%; }
+    .btn-primary { background: #8b5cf6; color: white; }
+    .btn-success { background: #22c55e; color: white; }
+    .btn-gray { background: #e5e7eb; color: #374151; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .date-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .date-btn { padding: 8px 4px; border: 2px solid #e5e7eb; border-radius: 8px; background: white; cursor: pointer; text-align: center; }
+    .date-btn.selected { background: #8b5cf6; color: white; border-color: #7c3aed; }
+    .date-btn.holiday { background: #fef2f2; border-color: #fecaca; }
+    .date-btn.holiday.selected { background: #ef4444; border-color: #dc2626; }
+    .day-label { text-align: center; font-size: 12px; font-weight: bold; padding: 4px; }
+    .day-label.holiday { color: #ef4444; }
+    .area-btn { padding: 16px; border: 2px solid #e5e7eb; border-radius: 12px; background: white; cursor: pointer; text-align: left; margin-bottom: 8px; display: block; width: 100%; }
+    .staff-btn { padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: white; cursor: pointer; text-align: left; margin-bottom: 4px; display: block; width: 100%; }
+    .hidden { display: none; }
+    .count-badge { background: #8b5cf6; color: white; padding: 4px 12px; border-radius: 20px; font-weight: bold; }
+    .error-box { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 12px; border-radius: 8px; margin-bottom: 16px; }
+    .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid #fff; border-radius: 50%; border-top-color: transparent; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="card" id="step1">
+  <h1 style="font-size: 24px; font-weight: bold; text-align: center; margin-bottom: 8px;">📝 出勤希望フォーム</h1>
+  <p style="text-align: center; color: #6b7280; margin-bottom: 8px;">2週間分の出勤希望を入力</p>
+  <div id="periodInfo" style="text-align:center;background:#f0f9ff;border:1px solid #93c5fd;padding:8px 12px;border-radius:8px;margin-bottom:16px;font-size:13px;color:#1d4ed8;"></div>
+  <h2 style="font-weight: bold; margin-bottom: 12px;">① エリアを選択</h2>
+  <div id="areaList"></div>
+  <div style="text-align: center; margin-top: 16px;">
+    <button onclick="refreshForm()" style="background: #f3f4f6; color: #6b7280; border: 1px solid #d1d5db; padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 13px;">🔄 最新に更新</button>
+  </div>
+</div>
+<div class="card hidden" id="step2">
+  <button onclick="goStep(1)" style="color: #6b7280; background: none; border: none; cursor: pointer; margin-bottom: 16px;">← 戻る</button>
+  <h2 style="font-weight: bold; margin-bottom: 12px;">② お名前を選択</h2>
+  <p style="color: #6b7280; margin-bottom: 12px;" id="areaLabel"></p>
+  <div id="staffList" style="max-height: 400px; overflow-y: auto;"></div>
+</div>
+<div class="card hidden" id="step3">
+  <button onclick="goStep(2)" style="color: #6b7280; background: none; border: none; cursor: pointer; margin-bottom: 16px;">← 戻る</button>
+  <h2 style="font-weight: bold; margin-bottom: 4px;">③ 出勤希望日を選択</h2>
+  <p style="color: #6b7280; margin-bottom: 16px;" id="staffLabel"></p>
+  <div style="background: #f3f4f6; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 16px;" id="periodLabel"></div>
+  <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+    <button class="btn btn-gray" onclick="selectAll()" style="flex:1;">全日選択</button>
+    <button class="btn btn-gray" onclick="clearAll()" style="flex:1;">クリア</button>
+  </div>
+  <div class="date-grid" id="dayLabels"></div>
+  <div class="date-grid" id="dateGrid" style="margin-bottom: 16px;"></div>
+  <div style="display: flex; justify-content: space-between; align-items: center; background: #f3f4f6; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+    <span>選択した日数</span>
+    <span class="count-badge" id="countBadge">0日</span>
+  </div>
+  <div id="errorMsg" class="error-box hidden"></div>
+  <div style="margin-bottom: 16px;">
+    <label style="font-weight: 500; display: block; margin-bottom: 4px;">連絡事項（任意）</label>
+    <textarea id="memo" rows="3" placeholder="例: 〇日は12時まで、△日は午後から　など" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 12px;"></textarea>
+  </div>
+  <button class="btn btn-primary" onclick="goStep(4)">確認画面へ →</button>
+</div>
+<div class="card hidden" id="step4">
+  <button onclick="goStep(3)" style="color: #6b7280; background: none; border: none; cursor: pointer; margin-bottom: 16px;">← 戻る</button>
+  <h2 style="font-weight: bold; margin-bottom: 16px;">④ 入力内容の確認</h2>
+  <div id="confirmContent" style="margin-bottom: 24px;"></div>
+  <button class="btn btn-success" id="submitBtn" onclick="submitForm()">✅ この内容で送信する</button>
+</div>
+<div class="card hidden" id="step5">
+  <div style="text-align: center;">
+    <div style="font-size: 60px; margin-bottom: 16px;">🎉</div>
+    <h2 style="font-size: 20px; font-weight: bold; color: #22c55e; margin-bottom: 8px;">送信完了！</h2>
+    <p style="color: #6b7280; margin-bottom: 24px;" id="completeMsg"></p>
+    <div style="background: #dcfce7; border: 1px solid #86efac; padding: 16px; border-radius: 12px; margin-bottom: 24px;">
+      <p style="color: #166534; font-weight: bold;">✅ 管理者に送信されました</p>
+    </div>
+    <button class="btn btn-gray" onclick="resetForm()">← トップに戻る</button>
+  </div>
+</div>
+<div class="card hidden" id="stepError">
+  <div style="text-align: center;">
+    <div style="font-size: 60px; margin-bottom: 16px;">⚠️</div>
+    <h2 style="font-size: 20px; font-weight: bold; color: #dc2626; margin-bottom: 8px;">送信エラー</h2>
+    <p style="color: #6b7280; margin-bottom: 24px;">ネットワークエラーが発生しました。再試行してください。</p>
+    <button class="btn btn-gray" onclick="goStep(4)">← 戻る</button>
+  </div>
+</div>
+<script>
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz7_29YMkw5_j9E5Tn4hGYYUcgowTsHd2SnZwl7KsP9g0M8PBtUbrXFjdYZR5j-aofo/exec';
+const DAYS = ['日', '月', '火', '水', '木', '金', '土'];
+const AREAS = {
+  "ミズカ エリア": { color: "#f59e0b" },
+  "ZONK エリア": { color: "#3b82f6" },
+  "タビクト": { color: "#22c55e" },
+  "あなぶき": { color: "#ec4899" },
+  "GB": { color: "#6366f1" }
+};
+const STAFF = {
+  "ミズカ エリア": ["三原 佳奈", "北村 要", "齋藤 璃美", "佐野 瞳", "北村 泰子", "柴崎 幹", "尾田 亜美", "岩橋 龍之介", "木下 創成", "中山 匠", "桑原 愛", "城園 慧慎", "島田 堅斗", "堺 祐斗", "安部 晴喜", "緒方 温人", "生地 太陽", "川路世龍", "藤本 優希", "上尾 雄大", "中村 真貴", "迫田 輝一", "川井田 稜弥", "林 大愛", "永渕 暖", "今泉 美樹", "松永 大和", "浦邊 蒼舵", "木村 花子", "大濱 光", "市原 京子", "元山 漣", "藤谷 羅大", "三城 怜虎", "西村 活輝", "梶原 彩巴", "田中 陸", "元井 海斗", "木村 哲士", "恒松 華", "大石 友紀"],
+  "ZONK エリア": ["横尾 大智", "今村 優人", "松本 拓也", "本多 順子", "齋藤 栞太", "青木 叶和", "DAU VAN AN（アン", "相賀 知弘", "橋長 真弓", "大智 未夢", "上野 まり", "HO QVOC AN（ホ", "嘉﨑 優衣", "馬 暁光", "TRAN NGOC CHIEN（チェン", "LE THI YEN（イェン", "那須 寿美香", "テムーレン（tem", "アマガラン（mga", "増田 ここな", "VU THI PHUONG（アイン", "犬塚 恒希", "蒲池 愛理", "デローアリシア海月", "小出 速斗", "結城 柊真", "永井 真奈", "佐藤 祐輔", "NURYANTI（ヌルヤンティ", "LE THUY LINH（リン", "島﨑 こころ", "皓 日娃（こう にちあい)", "末宗 璃久", "久保 蒼汰", "大山 怜", "BOLD TUGULDUR（tug)", "下村 旭泉", "スウ イウ チン（su)", "川久保 和弥", "JLANG YIZHUO(キョウ（kyo)", "宮崎 桃華", "春田 優心", "TRAN THI THANH(タン（Thanh）", "鹿毛 癒羽", "CHANG YUE(ジョウ ゲツ(chang yue)", "SUAIANA ABDUL RAKMAN(スシアナ", "今泉 楓", "EDOH(エドオ", "仲山 愛美", "嘉崎 優衣"],
+  "タビクト": ["甲斐 綾美", "鮎川 佳菜", "小西 良弥", "田頭 広樹", "吉田 肇", "石田 詩音", "早坂 潤", "朝長 睦", "本田 誠二", "神近 寿歩", "山下 光洋", "ペロウ 華 マリー", "石戸 正幸", "古井 愛子", "山下あゆみ", "江口 良子", "末松 亜紀"],
+  "あなぶき": ["岩田 愛", "オウスイ(王（wang）", "コウブンサン(高（gao）", "YAO WEIYUN (イウン（weiyun)", "KHUN WAI YAN MIN OO(クン（khun）", "ZHAHG FENGLIN(張 峰林（チョウ ホウ リン)", "LIN YU CHENG(林 育誠（リン イク ジョウ)", "楊 坤（よう こん（yang", "田中 真寿美", "三苫 奈未", "中岡 敦子", "田中 心緒", "室屋 歩", "福山 万里名", "松本 夕茉", "池邊 あゆみ", "伊藤 多唐", "古賀 美咲", "稗田 日実子", "木村 晴奈", "藤戸 善一朗", "五十嵐 久美子", "都 夢海", "海野 莉生", "岩崎 瞳", "竹尾 佳奈子", "渋谷 夢海", "岩崎 結衣"],
+  "GB": ["阿比留 眞美", "谷川 祐子", "木戸 菜美子", "秋吉 麻耶", "紙崎 鮎美", "牛島 亜沙美", "有馬 美紗", "山瀬 早紀子", "今野 祐子", "松尾 美帆", "小西 麻莉奈", "上野 壮一郎", "松本 匠平", "森山 理那", "吉岡 由香里", "丸田 祭", "田尻 唯", "原田 りの", "中村 光", "水本 琉晟", "北岡 知絵", "目 理恵", "梶原 はる香", "伊地知 幸伸", "叶 亜亭（ｙｅ ようあてい）", "ZHANG CHENGTAO(張(tyo)", "NI SIFU(ＮＩ(二）"]
+};
+const HOLIDAYS = {};
+let selectedArea = '';
+let selectedStaff = '';
+let selectedDates = {};
+let dates = [];
+let remoteStartDate = '';
+
+function getDefaultStartDate() {
+  const today = new Date();
+  const day = today.getDay();
+  const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(today.setDate(diff)).toISOString().split('T')[0];
+}
+
+function getStartDate() {
+  return remoteStartDate || getDefaultStartDate();
+}
+
+function generateDates() {
+  dates = [];
+  const start = new Date(getStartDate());
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    dates.push(d.toISOString().split('T')[0]);
+  }
+}
+
+function isHoliday(date) {
+  const d = new Date(date);
+  return d.getDay() === 0 || HOLIDAYS[date];
+}
+
+async function init() {
+  // Google Sheetsから確定シフトの開始日を取得
+  try {
+    const response = await fetch(GOOGLE_SCRIPT_URL);
+    const result = await response.json();
+    if (result.status === 'ok' && result.data) {
+      const finalizedData = JSON.parse(result.data);
+      if (finalizedData.startDate) {
+        remoteStartDate = finalizedData.startDate;
+      }
+      if (finalizedData.holidays) {
+        Object.assign(HOLIDAYS, finalizedData.holidays);
+      }
+    }
+  } catch (e) {
+    // 取得失敗時はデフォルト（今週月曜）を使用
+  }
+  generateDates();
+  renderAreaList();
+  renderDayLabels();
+  // 対象期間を表示
+  if (dates.length >= 2) {
+    const s = new Date(dates[0]), e = new Date(dates[dates.length - 1]);
+    document.getElementById('periodInfo').textContent = '📅 対象期間: ' + (s.getMonth()+1) + '/' + s.getDate() + ' 〜 ' + (e.getMonth()+1) + '/' + e.getDate();
+  }
+}
+function renderAreaList() {
+  const container = document.getElementById('areaList');
+  container.innerHTML = '';
+  Object.entries(AREAS).forEach(([name, data]) => {
+    const staffCount = (STAFF[name] || []).length;
+    const btn = document.createElement('button');
+    btn.className = 'area-btn';
+    btn.style.borderLeftWidth = '4px';
+    btn.style.borderLeftColor = data.color;
+    btn.innerHTML = '<strong>' + name + '</strong> <span style="color:#6b7280;">(' + staffCount + '名)</span>';
+    btn.onclick = () => selectArea(name);
+    container.appendChild(btn);
+  });
+}
+function renderDayLabels() {
+  const container = document.getElementById('dayLabels');
+  container.innerHTML = '';
+  DAYS.forEach((day, i) => {
+    const label = document.createElement('div');
+    label.className = 'day-label' + (i === 0 ? ' holiday' : '');
+    label.textContent = day;
+    container.appendChild(label);
+  });
+}
+function renderDateGrid() {
+  const container = document.getElementById('dateGrid');
+  container.innerHTML = '';
+  const firstDay = new Date(dates[0]).getDay();
+  for (let i = 0; i < firstDay; i++) container.appendChild(document.createElement('div'));
+  const areaColor = AREAS[selectedArea]?.color || '#8b5cf6';
+  dates.forEach(date => {
+    const d = new Date(date);
+    const hol = isHoliday(date);
+    const selected = selectedDates[date];
+    const btn = document.createElement('button');
+    btn.className = 'date-btn' + (hol ? ' holiday' : '') + (selected ? ' selected' : '');
+    btn.innerHTML = '<div style="font-weight:bold;">' + d.getDate() + '</div><div style="font-size:10px;">' + (selected ? '○' : '−') + '</div>';
+    btn.onclick = () => toggleDate(date);
+    if (selected && !hol) { btn.style.backgroundColor = areaColor; btn.style.borderColor = areaColor; }
+    container.appendChild(btn);
+  });
+  updateCount();
+}
+function selectArea(area) {
+  selectedArea = area;
+  document.getElementById('areaLabel').textContent = area;
+  renderStaffList();
+  goStep(2);
+}
+function renderStaffList() {
+  const container = document.getElementById('staffList');
+  container.innerHTML = '';
+  const staff = STAFF[selectedArea] || [];
+  staff.forEach((name, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'staff-btn';
+    btn.innerHTML = '<span style="color:#6b7280;margin-right:8px;">' + (i+1) + '.</span>' + name;
+    btn.onclick = () => selectStaffMember(name);
+    container.appendChild(btn);
+  });
+}
+function selectStaffMember(name) {
+  selectedStaff = name;
+  selectedDates = {};
+  document.getElementById('staffLabel').textContent = selectedStaff + 'さん';
+  document.getElementById('periodLabel').textContent = '対象期間：' + dates[0] + ' 〜 ' + dates[13];
+  renderDateGrid();
+  goStep(3);
+}
+function toggleDate(date) { selectedDates[date] = !selectedDates[date]; renderDateGrid(); }
+function selectAll() { dates.forEach(d => selectedDates[d] = true); renderDateGrid(); }
+function clearAll() { selectedDates = {}; renderDateGrid(); }
+function updateCount() { document.getElementById('countBadge').textContent = Object.values(selectedDates).filter(v => v).length + '日'; }
+function goStep(n) {
+  if (n === 4) {
+    if (!Object.values(selectedDates).filter(v => v).length) {
+      document.getElementById('errorMsg').textContent = '1日以上選択してください';
+      document.getElementById('errorMsg').classList.remove('hidden');
+      return;
+    }
+    document.getElementById('errorMsg').classList.add('hidden');
+    renderConfirm();
+  }
+  ['step1','step2','step3','step4','step5','stepError'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById('step' + n).classList.remove('hidden');
+}
+function renderConfirm() {
+  const selectedList = dates.filter(d => selectedDates[d]);
+  const memo = document.getElementById('memo').value;
+  const areaColor = AREAS[selectedArea]?.color || '#8b5cf6';
+  let html = '<div style="border-bottom:1px solid #e5e7eb;padding:8px 0;display:flex;justify-content:space-between;"><span style="color:#6b7280;">エリア</span><span style="font-weight:bold;color:' + areaColor + ';">' + selectedArea + '</span></div>';
+  html += '<div style="border-bottom:1px solid #e5e7eb;padding:8px 0;display:flex;justify-content:space-between;"><span style="color:#6b7280;">お名前</span><span style="font-weight:bold;">' + selectedStaff + '</span></div>';
+  html += '<div style="border-bottom:1px solid #e5e7eb;padding:8px 0;display:flex;justify-content:space-between;"><span style="color:#6b7280;">希望日数</span><span style="font-weight:bold;font-size:18px;">' + selectedList.length + '日</span></div>';
+  html += '<div style="padding:8px 0;"><span style="color:#6b7280;display:block;margin-bottom:8px;">希望日</span><div style="display:flex;flex-wrap:wrap;gap:4px;">';
+  selectedList.forEach(date => {
+    const d = new Date(date);
+    const hol = isHoliday(date);
+    html += '<span style="background:' + (hol ? '#fef2f2' : areaColor) + ';color:' + (hol ? '#dc2626' : 'white') + ';padding:4px 8px;border-radius:4px;font-size:12px;">' + (d.getMonth()+1) + '/' + d.getDate() + '(' + DAYS[d.getDay()] + ')</span>';
+  });
+  html += '</div></div>';
+  if (memo) {
+    html += '<div style="border-top:1px solid #e5e7eb;padding:8px 0;"><span style="color:#6b7280;display:block;margin-bottom:4px;">連絡事項</span><div style="background:#fffbeb;border:1px solid #fcd34d;padding:8px;border-radius:6px;color:#92400e;">' + memo + '</div></div>';
+  }
+  document.getElementById('confirmContent').innerHTML = html;
+}
+async function submitForm() {
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading"></span> 送信中...';
+  const selectedList = dates.filter(d => selectedDates[d]);
+  const memo = document.getElementById('memo').value;
+  const data = { timestamp: new Date().toISOString(), area: selectedArea, name: selectedStaff, dates: selectedList.join(','), dateCount: selectedList.length, memo: memo };
+  try {
+    await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    document.getElementById('completeMsg').textContent = selectedStaff + 'さんの出勤希望を送信しました';
+    goStep(5);
+  } catch (error) {
+    ['step1','step2','step3','step4','step5'].forEach(id => document.getElementById(id).classList.add('hidden'));
+    document.getElementById('stepError').classList.remove('hidden');
+  }
+  btn.disabled = false;
+  btn.innerHTML = '✅ この内容で送信する';
+}
+function resetForm() {
+  selectedArea = '';
+  selectedStaff = '';
+  selectedDates = {};
+  document.getElementById('memo').value = '';
+  goStep(1);
+}
+async function refreshForm() {
+  goStep(1);
+  selectedArea = '';
+  selectedStaff = '';
+  selectedDates = {};
+  await init();
+}
+init();
+</script>
+</body>
+</html>

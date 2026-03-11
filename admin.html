@@ -1,0 +1,4748 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>シフト管理（管理者用）</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Noto Sans JP', sans-serif; }
+    body { background: #f1f5f9; min-height: 100vh; }
+    .main-tab { padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; background: #e2e8f0; margin-right: 4px; }
+    .main-tab.active { background: #3b82f6; color: white; }
+    .area-tab { padding: 8px 16px; border-radius: 6px 6px 0 0; font-weight: 500; cursor: pointer; border: none; background: #e2e8f0; margin-right: 2px; font-size: 14px; }
+    .area-tab.active { background: white; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 6px 4px; text-align: center; border: 1px solid #e2e8f0; font-size: 12px; }
+    th { background: #f8fafc; font-weight: 600; }
+    input[type="number"], input[type="text"] { padding: 4px 6px; border: 1px solid #e2e8f0; border-radius: 4px; }
+    .btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; }
+    .btn-sm { padding: 6px 12px; font-size: 13px; }
+    .btn-xs { padding: 4px 8px; font-size: 11px; }
+    .btn-green { background: #22c55e; color: white; }
+    .btn-red { background: #ef4444; color: white; }
+    .btn-blue { background: #3b82f6; color: white; }
+    .btn-purple { background: #8b5cf6; color: white; }
+    .btn-gray { background: #e2e8f0; color: #374151; }
+    .btn-orange { background: #f97316; color: white; }
+    .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .modal-content { background: white; padding: 24px; border-radius: 16px; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto; }
+    .hidden { display: none; }
+    .holiday { background: #fef2f2 !important; }
+    .holiday-text { color: #dc2626; font-weight: bold; }
+    .setting-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; }
+    .staff-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 6px; flex-wrap: wrap; gap: 8px; }
+    .memo-text { background: #fffbeb; border: 1px solid #fcd34d; padding: 4px 8px; border-radius: 4px; font-size: 11px; color: #92400e; margin-top: 4px; }
+    .special-task-row { background: #f0fdf4; }
+  </style>
+</head>
+<body>
+
+<!-- モーダル類 -->
+
+<div id="addHotelModal" class="modal hidden"><div class="modal-content">
+  <h2 style="font-size:18px;font-weight:bold;margin-bottom:16px;">🏨 物件追加</h2>
+  <div style="margin-bottom:12px;"><label style="display:block;font-size:14px;margin-bottom:4px;">物件名 *</label><input type="text" id="newHotelName" style="width:100%;" placeholder="例: GB博多中央"></div>
+  <div style="margin-bottom:16px;"><label style="display:block;font-size:14px;margin-bottom:4px;">エリア</label><select id="newHotelArea" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;"></select></div>
+  <p style="font-size:12px;color:#6b7280;margin-bottom:12px;">※ 物件追加後、「号室設定」から号室と清掃時間を登録してください。</p>
+  <button class="btn btn-green" style="width:100%;" onclick="addHotel()">追加</button>
+  <button class="btn btn-gray" style="width:100%;margin-top:8px;" onclick="closeModal('addHotelModal')">キャンセル</button>
+</div></div>
+<div id="editHotelModal" class="modal hidden"><div class="modal-content">
+  <h2 style="font-size:18px;font-weight:bold;margin-bottom:16px;">🏨 物件編集</h2>
+  <div style="margin-bottom:12px;"><label style="display:block;font-size:14px;margin-bottom:4px;">物件名</label><input type="text" id="editHotelName" style="width:100%;"></div>
+  <div style="margin-bottom:16px;"><label style="display:block;font-size:14px;margin-bottom:4px;">エリア</label><select id="editHotelArea" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;"></select></div>
+  <button class="btn btn-blue" style="width:100%;" onclick="saveHotelEdit()">保存</button>
+  <button class="btn btn-gray" style="width:100%;margin-top:8px;" onclick="closeModal('editHotelModal')">キャンセル</button>
+</div></div>
+<div id="roomListModal" class="modal hidden"><div class="modal-content" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+    <h2 style="font-size:17px;font-weight:bold;">🛏 号室設定</h2>
+    <button class="btn btn-gray btn-sm" onclick="closeModal('roomListModal')">✕</button>
+  </div>
+  <p id="roomListHotelLabel" style="color:#6b7280;font-size:13px;margin-bottom:10px;"></p>
+  <div style="overflow-y:auto;flex:1;"><table style="width:100%;border-collapse:collapse;font-size:13px;" id="roomListTable"></table></div>
+  <div style="border-top:1px solid #e2e8f0;padding-top:10px;margin-top:10px;">
+    <p style="font-size:12px;font-weight:600;margin-bottom:6px;">＋ 部屋を追加</p>
+    <div style="display:flex;gap:8px;align-items:flex-end;">
+      <div style="flex:1;"><label style="display:block;font-size:11px;color:#6b7280;margin-bottom:2px;">部屋番号</label><input type="text" id="newRoomNumber" placeholder="例: 301" style="width:100%;padding:6px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;" onkeydown="if(event.key==='Enter')addRoomToHotel();"></div>
+      <div style="width:85px;"><label style="display:block;font-size:11px;color:#6b7280;margin-bottom:2px;">清掃時間(分)</label><input type="number" id="newRoomTime" value="60" min="1" style="width:100%;padding:6px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;"></div>
+      <button class="btn btn-green btn-sm" onclick="addRoomToHotel()">追加</button>
+    </div>
+  </div>
+</div></div>
+
+<div id="authModal" class="modal hidden">
+  <div class="modal-content">
+    <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px; text-align: center;">🔐 管理者認証</h2>
+    <input type="password" id="passwordInput" placeholder="パスワードを入力" style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; margin-bottom: 16px;">
+    <div id="authError" style="color: #dc2626; margin-bottom: 12px; text-align: center; display: none;">パスワードが違います</div>
+    <button class="btn btn-blue" style="width: 100%;" onclick="checkPassword()">ログイン</button>
+    <button class="btn btn-gray" style="width: 100%; margin-top: 8px;" onclick="closeModal('authModal')">キャンセル</button>
+  </div>
+</div>
+
+<div id="confirmModal" class="modal hidden">
+  <div class="modal-content">
+    <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px; text-align: center;">✅ シフトを確定しますか？</h2>
+    <button class="btn btn-purple" style="width: 100%;" onclick="finalizeSchedule()">確定する</button>
+    <button class="btn btn-gray" style="width: 100%; margin-top: 8px;" onclick="closeModal('confirmModal')">キャンセル</button>
+  </div>
+</div>
+
+  <!-- 公開管理モーダル -->
+  <div id="publishModal" class="modal hidden">
+    <div class="modal-content" style="max-width:480px;max-height:80vh;overflow-y:auto;">
+      <h2 style="font-size:16px;font-weight:bold;margin-bottom:16px;">📢 公開管理</h2>
+      <p style="font-size:13px;color:#6b7280;margin-bottom:12px;">公開ONの日付だけスタッフ側に表示されます</p>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button class="btn btn-green btn-sm" onclick="setAllPublish(true)">✅ 全公開</button>
+        <button class="btn btn-gray btn-sm" onclick="setAllPublish(false)">🚫 全非公開</button>
+      </div>
+      <div id="publishDateList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-purple" onclick="savePublishSettings()">💾 保存・反映</button>
+        <button class="btn btn-gray" onclick="closeModal('publishModal')">閉じる</button>
+      </div>
+    </div>
+  </div>
+  <!-- 公開管理モーダル -->
+  <div id="publishModal" class="modal-overlay hidden" onclick="if(event.target===this)closeModal('publishModal')">
+    <div class="modal-content" style="max-width:480px;max-height:80vh;overflow-y:auto;">
+      <h2 style="font-size:16px;font-weight:bold;margin-bottom:16px;">📢 公開管理</h2>
+      <p style="font-size:13px;color:#6b7280;margin-bottom:12px;">公開ONの日付だけスタッフ側に表示されます</p>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button class="btn btn-green btn-sm" onclick="setAllPublish(true)">✅ 全公開</button>
+        <button class="btn btn-gray btn-sm" onclick="setAllPublish(false)">🚫 全非公開</button>
+      </div>
+      <div id="publishDateList" style="display:flex;flex-direction:column;gap:6px;"></div>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-purple" onclick="savePublishSettings()">💾 保存・反映</button>
+        <button class="btn btn-gray" onclick="closeModal('publishModal')">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+<div id="addStaffModal" class="modal hidden">
+  <div class="modal-content" style="max-width:560px;max-height:85vh;display:flex;flex-direction:column;">
+    <h2 style="font-size:18px;font-weight:bold;margin-bottom:16px;">👤 スタッフ追加</h2>
+    <div style="overflow-y:auto;flex:1;">
+      <div style="margin-bottom:12px;"><label style="display:block;font-size:14px;margin-bottom:4px;">名前 *</label>
+        <input type="text" id="newStaffName" style="width:100%;" placeholder="例: 山田 太郎"></div>
+      <div style="margin-bottom:12px;display:flex;gap:16px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="newStaffLeader"><span style="font-size:13px;">👑 リーダー</span></label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="newStaffChecker"><span style="font-size:13px;">🔍 チェッカー</span></label>
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="display:block;font-size:14px;font-weight:bold;margin-bottom:8px;">🏨 行けるホテル</label>
+        <div id="addStaffHotels" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px;max-height:280px;overflow-y:auto;"></div>
+      </div>
+    </div>
+    <div style="padding-top:8px;border-top:1px solid #e2e8f0;">
+      <button class="btn btn-green" style="width:100%;" onclick="addStaff()">追加</button>
+      <button class="btn btn-gray" style="width:100%;margin-top:8px;" onclick="closeModal('addStaffModal')">キャンセル</button>
+    </div>
+  </div>
+</div>
+<div id="editStaffModal" class="modal hidden">
+  <div class="modal-content" style="max-width:560px;max-height:85vh;display:flex;flex-direction:column;">
+    <h2 style="font-size:18px;font-weight:bold;margin-bottom:16px;">✏️ スタッフ編集</h2>
+    <div style="overflow-y:auto;flex:1;">
+      <div style="margin-bottom:12px;"><label style="display:block;font-size:14px;margin-bottom:4px;">名前 *</label>
+        <input type="text" id="editStaffName" style="width:100%;" placeholder="例: 山田 太郎"></div>
+      <div style="margin-bottom:12px;display:flex;gap:16px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="editStaffLeader"><span style="font-size:13px;">👑 リーダー</span></label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="editStaffChecker"><span style="font-size:13px;">🔍 チェッカー</span></label>
+      </div>
+      <input type="hidden" id="editStaffRatio" value="1">
+      <div style="margin-bottom:16px;">
+        <label style="display:block;font-size:14px;font-weight:bold;margin-bottom:8px;">🏨 行けるホテル</label>
+        <div id="editStaffHotels" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px;max-height:280px;overflow-y:auto;"></div>
+      </div>
+    </div>
+    <div style="padding-top:8px;border-top:1px solid #e2e8f0;">
+      <button class="btn btn-blue" style="width:100%;" onclick="saveStaffEdit()">保存</button>
+      <button class="btn btn-gray" style="width:100%;margin-top:8px;" onclick="closeModal('editStaffModal')">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<div id="addAreaModal" class="modal hidden">
+  <div class="modal-content">
+    <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">🏨 エリア追加</h2>
+    <div style="margin-bottom: 12px;"><label style="display: block; font-size: 14px; margin-bottom: 4px;">エリア名 *</label>
+      <input type="text" id="newAreaName" style="width: 100%;" placeholder="例: 新ホテル"></div>
+    <div style="margin-bottom: 12px;"><label style="display: block; font-size: 14px; margin-bottom: 4px;">デフォルト客室数</label>
+      <input type="number" id="newAreaRooms" style="width: 100%;" value="50" min="0"></div>
+    <div style="margin-bottom: 12px;"><label style="display: block; font-size: 14px; margin-bottom: 4px;">1部屋あたり作業時間（分）</label>
+      <input type="number" id="newAreaTime" style="width: 100%;" value="60" min="1"></div>
+    <div style="margin-bottom: 16px;"><label style="display: block; font-size: 14px; margin-bottom: 4px;">テーマカラー</label>
+      <select id="newAreaColor" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px;">
+        <option value="#f59e0b">オレンジ</option><option value="#3b82f6">ブルー</option><option value="#22c55e">グリーン</option>
+        <option value="#ec4899">ピンク</option><option value="#6366f1">パープル</option><option value="#14b8a6">ティール</option>
+      </select></div>
+    <button class="btn btn-green" style="width: 100%;" onclick="addArea()">追加</button>
+    <button class="btn btn-gray" style="width: 100%; margin-top: 8px;" onclick="closeModal('addAreaModal')">キャンセル</button>
+  </div>
+</div>
+
+<div id="editAreaModal" class="modal hidden">
+  <div class="modal-content">
+    <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">🏨 エリア編集</h2>
+    <div style="margin-bottom: 12px;"><label style="display: block; font-size: 14px; margin-bottom: 4px;">エリア名</label>
+      <input type="text" id="editAreaName" style="width: 100%;"></div>
+    <div style="margin-bottom: 12px;"><label style="display: block; font-size: 14px; margin-bottom: 4px;">デフォルト客室数</label>
+      <input type="number" id="editAreaRooms" style="width: 100%;" min="0"></div>
+    <div style="margin-bottom: 12px;"><label style="display: block; font-size: 14px; margin-bottom: 4px;">1部屋あたり作業時間（分）</label>
+      <input type="number" id="editAreaTime" style="width: 100%;" min="1"></div>
+    <div style="margin-bottom: 16px;"><label style="display: block; font-size: 14px; margin-bottom: 4px;">テーマカラー</label>
+      <select id="editAreaColor" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px;">
+        <option value="#f59e0b">オレンジ</option><option value="#3b82f6">ブルー</option><option value="#22c55e">グリーン</option>
+        <option value="#ec4899">ピンク</option><option value="#6366f1">パープル</option><option value="#14b8a6">ティール</option>
+      </select></div>
+    <button class="btn btn-blue" style="width: 100%;" onclick="saveAreaEdit()">保存</button>
+    <button class="btn btn-gray" style="width: 100%; margin-top: 8px;" onclick="closeModal('editAreaModal')">キャンセル</button>
+  </div>
+</div>
+
+<div id="addSpecialTaskModal" class="modal hidden">
+  <div class="modal-content">
+    <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 8px;">🧹 特別作業追加</h2>
+    <div id="specialTaskAreaLabel" style="font-size:14px;font-weight:bold;color:#0369a1;background:#f0f9ff;border:1px solid #93c5fd;padding:8px 12px;border-radius:8px;margin-bottom:16px;text-align:center;"></div>
+    <div style="margin-bottom: 12px;"><label style="display: block; font-size: 14px; margin-bottom: 4px;">作業名 *</label>
+      <input type="text" id="newSpecialTaskName" style="width: 100%;" placeholder="例: 大浴場清掃、共用部、ロビー、酒配り"></div>
+    <div style="margin-bottom: 12px;"><label style="display: block; font-size: 14px; margin-bottom: 4px;">デフォルト必要人数</label>
+      <input type="number" id="newSpecialTaskRequired" style="width: 100%;" value="1" min="0"></div>
+    <p style="font-size: 12px; color: #6b7280; margin-bottom: 16px;">※日別で人数を0にすればその日は作業なしにできます</p>
+    <button class="btn btn-green" style="width: 100%;" onclick="addSpecialTask()">追加</button>
+    <button class="btn btn-gray" style="width: 100%; margin-top: 8px;" onclick="closeModal('addSpecialTaskModal')">キャンセル</button>
+  </div>
+</div>
+
+<div id="importModal" class="modal hidden">
+  <div class="modal-content">
+    <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">📥 スプレッドシートからデータ取込</h2>
+    <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+      <p style="font-size: 13px; color: #0369a1; margin-bottom: 8px;"><strong>手順：</strong></p>
+      <ol style="font-size: 12px; color: #0369a1; margin-left: 16px; line-height: 1.8;">
+        <li>Googleスプレッドシートを開く</li>
+        <li>データ全体を選択（ヘッダー行含む）</li>
+        <li>Ctrl+C でコピー</li>
+        <li>下の枠に Ctrl+V で貼り付け</li>
+      </ol>
+    </div>
+    <textarea id="importData" rows="8" placeholder="ここにスプレッドシートのデータを貼り付け..." style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 12px; margin-bottom: 16px;"></textarea>
+    <button class="btn btn-green" style="width: 100%;" onclick="importFromSpreadsheet()">取り込む</button>
+    <button class="btn btn-gray" style="width: 100%; margin-top: 8px;" onclick="closeModal('importModal')">キャンセル</button>
+  </div>
+</div>
+
+<div id="holidayModal" class="modal hidden">
+  <div class="modal-content">
+    <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">📅 祝日設定</h2>
+    <p style="font-size: 13px; color: #6b7280; margin-bottom: 12px;">クリックで祝日ON/OFF</p>
+    <div id="holidayList" style="max-height: 300px; overflow-y: auto;"></div>
+    <button class="btn btn-gray" style="width: 100%; margin-top: 16px;" onclick="closeModal('holidayModal')">閉じる</button>
+  </div>
+</div>
+
+<!-- 手動編集モーダル -->
+<div id="editShiftModal" class="modal hidden">
+  <div class="modal-content" style="max-width:700px;max-height:90vh;display:flex;flex-direction:column;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h2 style="font-size:17px;font-weight:bold;" id="editShiftTitle">✏️ シフト手動編集</h2>
+      <button class="btn btn-gray btn-sm" onclick="closeModal('editShiftModal')">✕</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;" id="editShiftContent"></div>
+    <div style="padding-top:10px;border-top:1px solid #e2e8f0;display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-blue" onclick="saveShiftEdit()">💾 保存</button>
+      <button class="btn btn-gray" onclick="closeModal('editShiftModal')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<header style="background: white; border-bottom: 1px solid #e2e8f0; padding: 16px;">
+  <div style="max-width: 1400px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+      <h1 style="font-size: 22px; font-weight: bold;">🏨 シフト管理（管理者用）</h1>
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <label style="font-size: 14px;">開始日:</label>
+        <input type="date" id="startDate" style="padding: 6px; border: 1px solid #e2e8f0; border-radius: 6px;">
+        <span id="startDateSync" style="font-size:11px;color:#6b7280;"></span>
+        <button class="btn btn-blue btn-sm" onclick="refreshData()">🔄 更新</button>
+      </div>
+    </div>
+    <div style="display: flex; gap: 4px; margin-top: 16px; flex-wrap: wrap;">
+      <button class="main-tab active" id="mainTab1" onclick="showMainTab(1)">📥 提出状況</button>
+      <button class="main-tab" id="mainTab2" onclick="showMainTab(2)">🚪 部屋数・人員</button>
+      <button class="main-tab" id="mainTab3" onclick="showMainTab(3)">📅 シフト表</button>
+      <button class="main-tab" id="mainTab4" onclick="showMainTab(4)">⚙️ 設定</button>
+    </div>
+  </div>
+</header>
+
+<main style="max-width: 1400px; margin: 0 auto; padding: 20px;">
+  <div id="message" style="display:none; padding: 12px; border-radius: 8px; margin-bottom: 16px;"></div>
+
+  <!-- タブ1: 提出状況 -->
+  <div id="mainPanel1">
+    <!-- データ取込ボックス -->
+    <div style="background: #f0fdf4; border: 2px dashed #22c55e; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 16px;">
+      <p style="font-size: 16px; font-weight: bold; color: #166534; margin-bottom: 8px;">📊 スプレッドシートからデータ取込</p>
+      <p style="font-size: 13px; color: #6b7280; margin-bottom: 12px;">スタッフがスマホで入力したデータを取り込みます</p>
+      <button class="btn btn-green" onclick="showModal('importModal')">📥 データ取込</button>
+    </div>
+    
+    <div style="background: white; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h2 style="font-size: 16px; font-weight: bold;">📊 全体提出状況</h2>
+        <button class="btn btn-red btn-sm" onclick="clearAllSubmissions()">🗑️ 提出クリア</button>
+      </div>
+      <div id="areaSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px;"></div>
+    </div>
+    <div style="background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+      <div style="padding: 12px 16px 0; border-bottom: 1px solid #e2e8f0;">
+        <div id="submissionAreaTabs" style="display: flex; flex-wrap: wrap;"></div>
+      </div>
+      <div id="submissionContent" style="padding: 16px; max-height: 500px; overflow-y: auto;"></div>
+    </div>
+  </div>
+
+  <!-- タブ2: 部屋数・人員配置 -->
+  <div id="mainPanel2" class="hidden">
+    <div style="background: white; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <h2 style="font-size: 16px; font-weight: bold;">🚪 日別清掃部屋数・人員配置</h2>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="btn btn-orange btn-sm" onclick="showModal('holidayModal'); renderHolidayList()">📅 祝日</button>
+          <button class="btn btn-blue btn-sm" onclick="setDefaultRooms()">デフォルト</button>
+        </div>
+      </div>
+      <div id="roomsAreaTabs" style="display:flex;flex-wrap:wrap;margin-bottom:12px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;"></div>
+      <p style="font-size:12px;color:#6b7280;margin-bottom:10px;">エリアを選択 → 物件名クリックで部屋一覧展開 → 清掃する部屋にチェック</p>
+      <div style="overflow-x:auto;" id="roomsMatrixWrap"></div>
+      <div id="specialTaskTableWrap" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <!-- タブ3: シフト表 -->
+  <div id="mainPanel3" class="hidden">
+    <div id="scheduleLockedView">
+      <div style="background: white; border-radius: 12px; padding: 40px; text-align: center;">
+        <div style="font-size: 60px; margin-bottom: 16px;">🔒</div>
+        <button class="btn btn-blue" onclick="showModal('authModal')">🔐 ログイン</button>
+      </div>
+    </div>
+    <div id="scheduleUnlockedView" class="hidden">
+      <div id="finalizeStatus" style="background: white; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px;"></div>
+      <div style="background: white; border-radius: 12px;">
+        <div style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <h2 style="font-size: 16px; font-weight: bold;">📅 シフト表</h2>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-green btn-sm" onclick="generateSchedule()">🔄 自動生成</button>
+            <button class="btn btn-purple btn-sm" onclick="showModal('confirmModal')">✅ 確定</button>
+            <button class="btn btn-blue btn-sm" onclick="showPublishModal()">📢 公開管理</button>
+            <button class="btn btn-gray btn-sm" onclick="lockSchedule()">🔒 ログアウト</button>
+          </div>
+        </div>
+        <div style="padding: 8px 16px 0; border-bottom: 1px solid #e2e8f0;">
+          <div id="scheduleAreaTabs" style="display: flex; flex-wrap: wrap;"></div>
+        </div>
+        <div style="padding: 12px 12px 0;">
+          <div id="checkerWarningsWrap"></div>
+        </div>
+        <div style="padding: 12px; overflow-x: auto;"><table id="scheduleTable"></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- タブ4: 設定 -->
+  <div id="mainPanel4" class="hidden">
+    <div id="settingsLockedView">
+      <div style="background: white; border-radius: 12px; padding: 40px; text-align: center;">
+        <div style="font-size: 60px; margin-bottom: 16px;">🔒</div>
+        <button class="btn btn-blue" onclick="showModal('authModal')">🔐 ログイン</button>
+      </div>
+    </div>
+    <div id="settingsUnlockedView" class="hidden">
+      <div class="setting-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h2 style="font-size:16px;font-weight:bold;">🏨 物件管理</h2>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-green btn-sm" onclick="showAddHotelModal()">＋ 物件追加</button>
+            <button class="btn btn-gray btn-sm" onclick="resetHotelsToDefault()" style="font-size:11px;">🔄 初期データに戻す</button>
+          </div>
+        </div>
+        <p style="font-size:12px;color:#6b7280;margin-bottom:10px;">「🛏 部屋設定」から部屋番号・清掃時間を編集できます。</p>
+        <div id="hotelList"></div>
+      </div>
+      <!-- エリア管理 -->
+      <div class="setting-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="font-size: 16px; font-weight: bold;">🏨 エリア管理</h2>
+          <button class="btn btn-green btn-sm" onclick="showModal('addAreaModal')">+ エリア追加</button>
+        </div>
+        <div id="areaList"></div>
+      </div>
+      <!-- 特別作業管理 -->
+      <div class="setting-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="font-size: 16px; font-weight: bold;">🧹 特別作業（客室以外）</h2>
+          <button class="btn btn-green btn-sm" onclick="showAddSpecialTaskModal()">+ 作業追加</button>
+        </div>
+        <div id="specialTaskAreaTabs" style="display: flex; flex-wrap: wrap; margin-bottom: 8px;"></div>
+        <div id="specialTaskList"></div>
+        <p style="font-size: 12px; color: #6b7280; margin-top: 8px;">※大浴場、共用部など客室以外の作業を追加できます。部屋数・人員タブで日別に人数調整可能。</p>
+      </div>
+      <!-- スタッフ管理 -->
+      <div class="setting-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="font-size: 16px; font-weight: bold;">👥 スタッフ管理</h2>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-green btn-sm" onclick="showAddStaffModal()">+ スタッフ追加</button>
+            <button class="btn btn-gray btn-sm" onclick="resetStaffToDefault()" style="font-size:11px;">🔄 初期データに戻す</button>
+          </div>
+        </div>
+        <div id="settingsAreaTabs" style="display: flex; flex-wrap: wrap; margin-bottom: 8px;"></div>
+        <div id="staffList" style="max-height: 350px; overflow-y: auto;"></div>
+      </div>
+      <!-- データ管理 -->
+      <div class="setting-card">
+        <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 12px;">💾 データ管理</h2>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="btn btn-blue btn-sm" onclick="exportAllData()">📤 エクスポート</button>
+          <button class="btn btn-orange btn-sm" onclick="document.getElementById('importFile').click()">📥 インポート</button>
+          <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importAllData(event)">
+          <button class="btn btn-red btn-sm" onclick="resetAllData()">⚠️ 全リセット</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+
+
+function showAddStaffModal() {
+  document.getElementById('newStaffName').value = '';
+  const leaderCb = document.getElementById('newStaffLeader');
+  const checkerCb = document.getElementById('newStaffChecker');
+  if (leaderCb) leaderCb.checked = false;
+  if (checkerCb) checkerCb.checked = false;
+  const hotelsDiv = document.getElementById('addStaffHotels');
+  if (hotelsDiv) {
+    const allHotels = masterData.hotels || [];
+    const byArea = {};
+    allHotels.forEach(h => { if (!byArea[h.area]) byArea[h.area] = []; byArea[h.area].push(h); });
+    let hhtml = '';
+    Object.entries(byArea).forEach(([area, hotels]) => {
+      const aData = masterData.areas[area] || {};
+      const isMyArea = area === currentSettingsArea;
+      hhtml += '<div style="margin-bottom:8px;">'
+        + '<div style="font-size:11px;font-weight:bold;color:' + (aData.color||'#666') + ';background:' + (aData.bg||'#f9f9f9') + ';padding:3px 8px;border-radius:4px;margin-bottom:4px;">'
+        + area + (isMyArea ? ' ★所属' : '') + '</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+      hotels.forEach(h => {
+        hhtml += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:3px 8px;font-size:12px;">'
+          + '<input type="checkbox" name="newStaffHotel" value="' + h.name + '">'
+          + h.name + '</label>';
+      });
+      hhtml += '</div></div>';
+    });
+    hotelsDiv.innerHTML = hhtml;
+  }
+  showModal('addStaffModal');
+}
+
+
+
+const ADMIN_PASSWORD = '3618';
+const STORAGE_KEY = 'hotel_shift_shared_data';
+const ADMIN_STORAGE_KEY = 'hotel_shift_admin_data';
+const FINALIZED_STORAGE_KEY = 'hotel_shift_finalized';
+const MASTER_STORAGE_KEY = 'hotel_shift_master';
+const MASTER_VERSION_KEY = 'hotel_shift_master_version';
+const MASTER_VERSION = '2025-v5';  // ← バージョンを上げると次回起動時にDEFAULT_MASTERで上書きされる
+const DAYS = ['日', '月', '火', '水', '木', '金', '土'];
+const COLOR_MAP = {"#f59e0b":"#fef3c7","#3b82f6":"#dbeafe","#22c55e":"#dcfce7","#ec4899":"#fce7f3","#6366f1":"#e0e7ff","#14b8a6":"#ccfbf1"};
+
+const DEFAULT_MASTER = {
+  areas: {
+    "ミズカ エリア": { color: "#f59e0b", bg: "#fef3c7", default_rooms: 60, time_per_room: 58 },
+    "ZONK エリア": { color: "#3b82f6", bg: "#dbeafe", default_rooms: 73, time_per_room: 63 },
+    "タビクト": { color: "#22c55e", bg: "#dcfce7", default_rooms: 42, time_per_room: 73 },
+    "あなぶき": { color: "#ec4899", bg: "#fce7f3", default_rooms: 49, time_per_room: 82 },
+    "GB": { color: "#6366f1", bg: "#e0e7ff", default_rooms: 71, time_per_room: 59 }
+  },
+  specialTasks: {},
+  staff: {
+  "ミズカ エリア": [{name: "三原 佳奈", ratio: 1, isLeader: true, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）"]}, {name: "北村 要", ratio: 1, isLeader: true, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）"]}, {name: "齋藤 璃美", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5"]}, {name: "佐野 瞳", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）"]}, {name: "北村 泰子", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）"]}, {name: "柴崎 幹", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "尾田 亜美", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）"]}, {name: "岩橋 龍之介", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "木下 創成", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "中山 匠", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "桑原 愛", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "城園 慧慎", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "島田 堅斗", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）"]}, {name: "堺 祐斗", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "安部 晴喜", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "緒方 温人", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "生地 太陽", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）"]}, {name: "川路世龍", ratio: 1, isLeader: false, isChecker: false, hotels: ["トリップポッド美野島A", "トリップポッド住吉A", "トリップポッド住吉B", "トリップポッド住吉C", "町屋春吉"]}, {name: "藤本 優希", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）"]}, {name: "上尾 雄大", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "中村 真貴", ratio: 1, isLeader: false, isChecker: false, hotels: ["トリップポッド高砂A", "トリップポッド高砂B", "トリップポッド美野島A", "トリップポッド住吉A", "トリップポッド住吉B", "トリップポッド住吉C", "町屋春吉", "トリップポッド対馬小路", "トリップポッド古門戸町", "町屋奈良屋町1", "町屋奈良屋町2", "博多町屋", "アルファベットイン大濠", "コンフォート博多"]}, {name: "迫田 輝一", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）"]}, {name: "川井田 稜弥", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）"]}, {name: "林 大愛", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "永渕 暖", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）"]}, {name: "今泉 美樹", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "松永 大和", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）"]}, {name: "浦邊 蒼舵", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）"]}, {name: "木村 花子", ratio: 1, isLeader: false, isChecker: false, hotels: ["アルファベットイン大濠"]}, {name: "大濱 光", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "市原 京子", ratio: 1, isLeader: false, isChecker: false, hotels: ["アルファベットイン大濠"]}, {name: "元山 漣", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "藤谷 羅大", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "三城 怜虎", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "西村 活輝", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "梶原 彩巴", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "田中 陸", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "元井 海斗", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4"]}, {name: "木村 哲士", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "ZONK出会い橋", "Nakasu5"]}, {name: "恒松 華", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5"]}, {name: "大石 友紀", ratio: 1, isLeader: false, isChecker: false, hotels: ["Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5"]}],
+  "ZONK エリア": [{name: "横尾 大智", ratio: 1, isLeader: true, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "今村 優人", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "松本 拓也", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "本多 順子", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "齋藤 栞太", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "青木 叶和", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "DAU VAN AN（アン", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "相賀 知弘", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "橋長 真弓", ratio: 1, isLeader: false, isChecker: false, hotels: ["Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5"]}, {name: "大智 未夢", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "上野 まり", ratio: 1, isLeader: false, isChecker: false, hotels: ["Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5", "博多駅前"]}, {name: "HO QVOC AN（ホ", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "嘉﨑 優衣", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "馬 暁光", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "ZONK出会い橋", "Nakasu5"]}, {name: "TRAN NGOC CHIEN（チェン", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "LE THI YEN（イェン", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "那須 寿美香", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "テムーレン（tem", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "アマガラン（mga", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "増田 ここな", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "VU THI PHUONG（アイン", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "犬塚 恒希", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "蒲池 愛理", ratio: 1, isLeader: false, isChecker: false, hotels: ["Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5", "博多駅前"]}, {name: "デローアリシア海月", ratio: 1, isLeader: false, isChecker: false, hotels: ["Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5", "博多駅前"]}, {name: "小出 速斗", ratio: 1, isLeader: false, isChecker: false, hotels: ["Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5"]}, {name: "結城 柊真", ratio: 1, isLeader: false, isChecker: false, hotels: ["Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5"]}, {name: "永井 真奈", ratio: 1, isLeader: false, isChecker: false, hotels: ["Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5", "博多駅前"]}, {name: "佐藤 祐輔", ratio: 1, isLeader: false, isChecker: false, hotels: ["Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5"]}, {name: "NURYANTI（ヌルヤンティ", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "LE THUY LINH（リン", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "島﨑 こころ", ratio: 1, isLeader: false, isChecker: false, hotels: ["Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5"]}, {name: "皓 日娃（こう にちあい)", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "末宗 璃久", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5", "博多駅前"]}, {name: "久保 蒼汰", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "大山 怜", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "BOLD TUGULDUR（tug)", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "下村 旭泉", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "スウ イウ チン（su)", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5", "博多駅前"]}, {name: "川久保 和弥", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5", "博多駅前"]}, {name: "JLANG YIZHUO(キョウ（kyo)", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "宮崎 桃華", ratio: 1, isLeader: false, isChecker: false, hotels: ["Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5", "博多駅前"]}, {name: "春田 優心", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5"]}, {name: "TRAN THI THANH(タン（Thanh）", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "鹿毛 癒羽", ratio: 1, isLeader: false, isChecker: false, hotels: ["Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5"]}, {name: "CHANG YUE(ジョウ ゲツ(chang yue)", ratio: 1, isLeader: false, isChecker: false, hotels: ["GB博多門", "エイワプレイス"]}, {name: "SUAIANA ABDUL RAKMAN(スシアナ", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5"]}, {name: "今泉 楓", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5"]}, {name: "EDOH(エドオ", ratio: 1, isLeader: false, isChecker: false, hotels: ["Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5"]}, {name: "仲山 愛美", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5"]}, {name: "嘉崎 優衣", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5"]}],
+  "タビクト": [{name: "甲斐 綾美", ratio: 1, isLeader: true, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5", "グランドベース博多", "GB博多奈良屋", "GB博多門", "GB福岡天神", "グランドベース春吉", "エイワプレイス", "トリップポッド高砂A", "トリップポッド高砂B", "トリップポッド美野島A", "トリップポッド住吉A", "トリップポッド住吉B", "トリップポッド住吉C", "町屋春吉", "トリップポッド対馬小路", "トリップポッド古門戸町", "町屋奈良屋町1", "町屋奈良屋町2", "博多町屋"]}, {name: "鮎川 佳菜", ratio: 1, isLeader: false, isChecker: false, hotels: ["GB福岡天神", "トリップポッド高砂A", "トリップポッド高砂B"]}, {name: "小西 良弥", ratio: 1, isLeader: false, isChecker: false, hotels: ["トリップポッド高砂A", "トリップポッド高砂B", "トリップポッド美野島A", "トリップポッド住吉A", "トリップポッド住吉B", "トリップポッド住吉C", "町屋春吉"]}, {name: "田頭 広樹", ratio: 1, isLeader: false, isChecker: false, hotels: ["GB福岡天神", "グランドベース春吉", "トリップポッド美野島A", "トリップポッド住吉A", "トリップポッド住吉B", "トリップポッド住吉C", "町屋春吉"]}, {name: "吉田 肇", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "ZONK出会い橋", "Nakasu5", "トリップポッド高砂A", "トリップポッド高砂B"]}, {name: "石田 詩音", ratio: 1, isLeader: false, isChecker: false, hotels: ["トリップポッド高砂A", "トリップポッド高砂B"]}, {name: "早坂 潤", ratio: 1, isLeader: false, isChecker: false, hotels: ["トリップポッド高砂A", "トリップポッド高砂B", "トリップポッド美野島A", "トリップポッド住吉A", "トリップポッド住吉B", "トリップポッド住吉C", "町屋春吉"]}, {name: "朝長 睦", ratio: 1, isLeader: false, isChecker: false, hotels: ["トリップポッド美野島A", "博多駅前"]}, {name: "本田 誠二", ratio: 1, isLeader: false, isChecker: false, hotels: ["グランドベース博多", "GB博多奈良屋", "GB博多門", "トリップポッド高砂A", "トリップポッド高砂B", "トリップポッド美野島A", "トリップポッド住吉A", "トリップポッド住吉B", "トリップポッド住吉C", "町屋春吉", "トリップポッド対馬小路", "トリップポッド古門戸町", "町屋奈良屋町1", "町屋奈良屋町2", "博多町屋"]}, {name: "神近 寿歩", ratio: 1, isLeader: false, isChecker: false, hotels: ["トリップポッド対馬小路", "トリップポッド古門戸町", "町屋奈良屋町1", "町屋奈良屋町2", "博多町屋"]}, {name: "山下 光洋", ratio: 1, isLeader: false, isChecker: false, hotels: ["グランドベース博多", "GB博多奈良屋", "GB博多門", "トリップポッド対馬小路", "トリップポッド古門戸町", "町屋奈良屋町1", "町屋奈良屋町2", "博多町屋"]}, {name: "ペロウ 華 マリー", ratio: 1, isLeader: false, isChecker: false, hotels: ["グランドベース博多", "GB博多奈良屋", "GB博多門", "エイワプレイス", "トリップポッド対馬小路", "トリップポッド古門戸町", "町屋奈良屋町1", "町屋奈良屋町2", "博多町屋"]}, {name: "石戸 正幸", ratio: 1, isLeader: false, isChecker: false, hotels: []}, {name: "古井 愛子", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5", "トリップポッド高砂A", "トリップポッド高砂B", "トリップポッド美野島A", "トリップポッド住吉A", "トリップポッド住吉B", "トリップポッド住吉C", "町屋春吉", "トリップポッド対馬小路", "トリップポッド古門戸町", "町屋奈良屋町1", "町屋奈良屋町2", "博多町屋", "アルファベットイン大濠", "博多駅前"]}, {name: "山下あゆみ", ratio: 1, isLeader: false, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5", "トリップポッド高砂A", "トリップポッド高砂B", "トリップポッド美野島A", "トリップポッド住吉A", "トリップポッド住吉B", "トリップポッド住吉C", "町屋春吉"]}, {name: "江口 良子", ratio: 1, isLeader: false, isChecker: false, hotels: ["トリップポッド高砂A", "トリップポッド高砂B", "トリップポッド美野島A", "トリップポッド住吉A", "トリップポッド住吉B", "トリップポッド住吉C", "町屋春吉", "トリップポッド対馬小路", "トリップポッド古門戸町", "町屋奈良屋町1", "町屋奈良屋町2", "博多町屋"]}, {name: "末松 亜紀", ratio: 1, isLeader: false, isChecker: false, hotels: ["Nakasu1（mizuka中州）", "トリップポッド高砂A", "トリップポッド高砂B", "トリップポッド美野島A", "トリップポッド住吉A", "トリップポッド住吉B", "トリップポッド住吉C", "町屋春吉"]}],
+  "あなぶき": [{name: "岩田 愛", ratio: 1, isLeader: true, isChecker: false, hotels: ["Daimyo1", "Daimyo3", "Daimyo6", "Daimyo7", "Imaizumi1", "Imaizumi2", "Imaizumi3", "Imaizumi4", "Nakasu1（mizuka中州）", "ZONK出会い橋", "Nakasu5", "グランドベース博多", "GB博多奈良屋", "GB博多門", "GB福岡天神", "グランドベース春吉", "トリップポッド高砂A", "トリップポッド高砂B", "トリップポッド美野島A", "トリップポッド住吉A", "トリップポッド住吉B", "トリップポッド住吉C", "町屋春吉", "トリップポッド対馬小路", "トリップポッド古門戸町", "町屋奈良屋町1", "町屋奈良屋町2", "博多町屋", "アルファベットイン大濠", "コンフォート博多", "博多駅前"]}, {name: "オウスイ(王（wang）", ratio: 1, isLeader: false, isChecker: false, hotels: ["エイワプレイス", "博多駅前"]}, {name: "コウブンサン(高（gao）", ratio: 1, isLeader: false, isChecker: false, hotels: ["エイワプレイス", "博多駅前"]}, {name: "YAO WEIYUN (イウン（weiyun)", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5", "博多駅前"]}, {name: "KHUN WAI YAN MIN OO(クン（khun）", ratio: 1, isLeader: false, isChecker: false, hotels: ["GB博多奈良屋", "GB博多門", "博多駅前"]}, {name: "ZHAHG FENGLIN(張 峰林（チョウ ホウ リン)", ratio: 1, isLeader: false, isChecker: false, hotels: ["博多駅前"]}, {name: "LIN YU CHENG(林 育誠（リン イク ジョウ)", ratio: 1, isLeader: false, isChecker: false, hotels: ["博多駅前"]}, {name: "楊 坤（よう こん（yang", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5", "博多駅前"]}, {name: "田中 真寿美", ratio: 1, isLeader: false, isChecker: false, hotels: ["コンフォート博多", "博多駅前"]}, {name: "三苫 奈未", ratio: 1, isLeader: false, isChecker: false, hotels: ["コンフォート博多", "博多駅前"]}, {name: "中岡 敦子", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5", "コンフォート博多", "博多駅前"]}, {name: "田中 心緒", ratio: 1, isLeader: false, isChecker: false, hotels: ["コンフォート博多"]}, {name: "室屋 歩", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5", "アルファベットイン大濠", "コンフォート博多", "博多駅前"]}, {name: "福山 万里名", ratio: 1, isLeader: false, isChecker: false, hotels: ["コンフォート博多", "博多駅前"]}, {name: "松本 夕茉", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5", "コンフォート博多", "博多駅前"]}, {name: "池邊 あゆみ", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5", "コンフォート博多", "博多駅前"]}, {name: "伊藤 多唐", ratio: 1, isLeader: false, isChecker: false, hotels: ["コンフォート博多", "博多駅前"]}, {name: "古賀 美咲", ratio: 1, isLeader: false, isChecker: false, hotels: ["コンフォート博多", "博多駅前"]}, {name: "稗田 日実子", ratio: 1, isLeader: false, isChecker: false, hotels: ["コンフォート博多", "博多駅前"]}, {name: "木村 晴奈", ratio: 1, isLeader: false, isChecker: false, hotels: ["コンフォート博多", "博多駅前"]}, {name: "藤戸 善一朗", ratio: 1, isLeader: false, isChecker: false, hotels: ["コンフォート博多", "博多駅前"]}, {name: "五十嵐 久美子", ratio: 1, isLeader: false, isChecker: false, hotels: ["コンフォート博多", "博多駅前"]}, {name: "都 夢海", ratio: 1, isLeader: false, isChecker: false, hotels: ["コンフォート博多", "博多駅前"]}, {name: "海野 莉生", ratio: 1, isLeader: false, isChecker: false, hotels: ["博多駅前"]}, {name: "岩崎 瞳", ratio: 1, isLeader: false, isChecker: false, hotels: ["アルファベットイン大濠"]}, {name: "竹尾 佳奈子", ratio: 1, isLeader: false, isChecker: false, hotels: ["アルファベットイン大濠"]}, {name: "渋谷 夢海", ratio: 1, isLeader: false, isChecker: false, hotels: ["アルファベットイン大濠"]}, {name: "岩崎 結衣", ratio: 1, isLeader: false, isChecker: false, hotels: ["アルファベットイン大濠"]}],
+  "GB": [{name: "木戸 菜美子", ratio: 1, isLeader: true, isChecker: false, hotels: ["グランドベース博多", "GB博多奈良屋", "GB博多門", "GB福岡天神", "グランドベース春吉", "トリップポッド美野島A", "トリップポッド住吉A", "トリップポッド住吉B", "トリップポッド住吉C", "町屋春吉", "トリップポッド対馬小路", "トリップポッド古門戸町", "町屋奈良屋町1", "町屋奈良屋町2", "博多町屋"]}, {name: "阿比留 眞美", ratio: 1, isLeader: false, isChecker: false, hotels: ["GB福岡天神", "グランドベース春吉"]}, {name: "谷川 祐子", ratio: 1, isLeader: false, isChecker: false, hotels: ["GB福岡天神", "グランドベース春吉"]}, {name: "秋吉 麻耶", ratio: 1, isLeader: false, isChecker: false, hotels: ["GB福岡天神", "グランドベース春吉"]}, {name: "紙崎 鮎美", ratio: 1, isLeader: false, isChecker: false, hotels: ["グランドベース博多", "GB博多奈良屋", "GB博多門", "GB福岡天神", "グランドベース春吉"]}, {name: "牛島 亜沙美", ratio: 1, isLeader: false, isChecker: false, hotels: ["グランドベース博多", "GB博多奈良屋", "GB博多門", "GB福岡天神", "トリップポッド美野島A", "トリップポッド住吉A", "トリップポッド住吉B", "トリップポッド住吉C", "町屋春吉", "トリップポッド対馬小路", "トリップポッド古門戸町", "町屋奈良屋町1", "町屋奈良屋町2", "博多町屋"]}, {name: "有馬 美紗", ratio: 1, isLeader: false, isChecker: false, hotels: ["グランドベース博多", "GB博多奈良屋", "GB博多門", "エイワプレイス"]}, {name: "山瀬 早紀子", ratio: 1, isLeader: false, isChecker: false, hotels: ["エイワプレイス"]}, {name: "今野 祐子", ratio: 1, isLeader: false, isChecker: false, hotels: ["グランドベース博多", "GB博多奈良屋", "GB博多門", "エイワプレイス", "トリップポッド対馬小路", "トリップポッド古門戸町", "町屋奈良屋町1", "町屋奈良屋町2", "博多町屋", "コンフォート博多"]}, {name: "松尾 美帆", ratio: 1, isLeader: false, isChecker: false, hotels: ["グランドベース博多", "GB博多奈良屋", "GB博多門"]}, {name: "小西 麻莉奈", ratio: 1, isLeader: false, isChecker: false, hotels: ["グランドベース博多", "GB博多奈良屋", "GB博多門", "GB福岡天神", "グランドベース春吉"]}, {name: "上野 壮一郎", ratio: 1, isLeader: false, isChecker: false, hotels: ["エイワプレイス"]}, {name: "松本 匠平", ratio: 1, isLeader: false, isChecker: false, hotels: ["GB博多門", "エイワプレイス", "トリップポッド対馬小路", "トリップポッド古門戸町", "町屋奈良屋町1", "町屋奈良屋町2", "博多町屋"]}, {name: "森山 理那", ratio: 1, isLeader: false, isChecker: false, hotels: ["エイワプレイス"]}, {name: "吉岡 由香里", ratio: 1, isLeader: false, isChecker: false, hotels: ["グランドベース博多", "GB博多奈良屋", "GB博多門", "エイワプレイス"]}, {name: "丸田 祭", ratio: 1, isLeader: false, isChecker: false, hotels: ["GB福岡天神"]}, {name: "田尻 唯", ratio: 1, isLeader: false, isChecker: false, hotels: ["GB福岡天神", "グランドベース春吉"]}, {name: "原田 りの", ratio: 1, isLeader: false, isChecker: false, hotels: ["GB福岡天神", "グランドベース春吉"]}, {name: "中村 光", ratio: 1, isLeader: false, isChecker: false, hotels: ["エイワプレイス"]}, {name: "水本 琉晟", ratio: 1, isLeader: false, isChecker: false, hotels: ["エイワプレイス"]}, {name: "北岡 知絵", ratio: 1, isLeader: false, isChecker: false, hotels: ["グランドベース博多", "GB博多奈良屋", "GB博多門"]}, {name: "目 理恵", ratio: 1, isLeader: false, isChecker: false, hotels: ["グランドベース博多", "GB博多奈良屋", "GB博多門"]}, {name: "梶原 はる香", ratio: 1, isLeader: false, isChecker: false, hotels: ["エイワプレイス"]}, {name: "伊地知 幸伸", ratio: 1, isLeader: false, isChecker: false, hotels: ["グランドベース博多", "GB博多奈良屋", "GB博多門", "トリップポッド対馬小路", "トリップポッド古門戸町", "町屋奈良屋町1", "町屋奈良屋町2", "博多町屋"]}, {name: "叶 亜亭（ｙｅ ようあてい）", ratio: 1, isLeader: false, isChecker: false, hotels: ["ZONK出会い橋", "Nakasu5", "エイワプレイス"]}, {name: "ZHANG CHENGTAO(張(tyo)", ratio: 1, isLeader: false, isChecker: false, hotels: ["エイワプレイス", "博多駅前"]}, {name: "NI SIFU(ＮＩ(二）", ratio: 1, isLeader: false, isChecker: false, hotels: ["エイワプレイス", "博多駅前"]}]
+  },
+  holidays: {},
+  hotels: [
+  {
+    "name": "Daimyo1",
+    "area": "ミズカ エリア",
+    "default_rooms": 4,
+    "time_per_room": 60,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "301",
+        "time": 60
+      },
+      {
+        "room": "302",
+        "time": 60
+      },
+      {
+        "room": "303",
+        "time": 60
+      },
+      {
+        "room": "304",
+        "time": 60
+      }
+    ]
+  },
+  {
+    "name": "Daimyo3",
+    "area": "ミズカ エリア",
+    "default_rooms": 4,
+    "time_per_room": 60,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "501",
+        "time": 60
+      },
+      {
+        "room": "502",
+        "time": 60
+      },
+      {
+        "room": "503",
+        "time": 60
+      },
+      {
+        "room": "504",
+        "time": 60
+      }
+    ]
+  },
+  ,
+  {
+    "name": "Daimyo6",
+    "area": "ミズカ エリア",
+    "default_rooms": 6,
+    "time_per_room": 60,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "501",
+        "time": 60
+      },
+      {
+        "room": "502",
+        "time": 60
+      },
+      {
+        "room": "503",
+        "time": 60
+      },
+      {
+        "room": "504",
+        "time": 60
+      },
+      {
+        "room": "505",
+        "time": 60
+      },
+      {
+        "room": "506",
+        "time": 60
+      }
+    ]
+  },
+  {
+    "name": "Daimyo7",
+    "area": "ミズカ エリア",
+    "default_rooms": 21,
+    "time_per_room": 52,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 40
+      },
+      {
+        "room": "102",
+        "time": 40
+      },
+      {
+        "room": "103",
+        "time": 60
+      },
+      {
+        "room": "104",
+        "time": 60
+      },
+      {
+        "room": "105",
+        "time": 60
+      },
+      {
+        "room": "201",
+        "time": 40
+      },
+      {
+        "room": "202",
+        "time": 40
+      },
+      {
+        "room": "203",
+        "time": 60
+      },
+      {
+        "room": "204",
+        "time": 60
+      },
+      {
+        "room": "205",
+        "time": 60
+      },
+      {
+        "room": "206",
+        "time": 60
+      },
+      {
+        "room": "301",
+        "time": 40
+      },
+      {
+        "room": "302",
+        "time": 40
+      },
+      {
+        "room": "303",
+        "time": 60
+      },
+      {
+        "room": "304",
+        "time": 60
+      },
+      {
+        "room": "305",
+        "time": 60
+      },
+      {
+        "room": "306",
+        "time": 60
+      },
+      {
+        "room": "401",
+        "time": 70
+      },
+      {
+        "room": "402",
+        "time": 30
+      },
+      {
+        "room": "403",
+        "time": 30
+      },
+      {
+        "room": "404",
+        "time": 60
+      }
+    ]
+  },
+  {
+    "name": "Imaizumi1",
+    "area": "ミズカ エリア",
+    "default_rooms": 2,
+    "time_per_room": 60,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "502",
+        "time": 60
+      },
+      {
+        "room": "505",
+        "time": 60
+      }
+    ]
+  },
+  {
+    "name": "Imaizumi2",
+    "area": "ミズカ エリア",
+    "default_rooms": 8,
+    "time_per_room": 60,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 60
+      },
+      {
+        "room": "102",
+        "time": 60
+      },
+      {
+        "room": "103",
+        "time": 60
+      },
+      {
+        "room": "201",
+        "time": 60
+      },
+      {
+        "room": "202",
+        "time": 60
+      },
+      {
+        "room": "203",
+        "time": 60
+      },
+      {
+        "room": "204",
+        "time": 60
+      },
+      {
+        "room": "205",
+        "time": 60
+      }
+    ]
+  },
+  {
+    "name": "Imaizumi3",
+    "area": "ミズカ エリア",
+    "default_rooms": 3,
+    "time_per_room": 60,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "301",
+        "time": 60
+      },
+      {
+        "room": "401",
+        "time": 60
+      },
+      {
+        "room": "405",
+        "time": 60
+      }
+    ]
+  },
+  {
+    "name": "Imaizumi4",
+    "area": "ミズカ エリア",
+    "default_rooms": 3,
+    "time_per_room": 60,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "301",
+        "time": 60
+      },
+      {
+        "room": "302",
+        "time": 60
+      },
+      {
+        "room": "303",
+        "time": 60
+      }
+    ]
+  },
+  {
+    "name": "Nakasu1（mizuka中州）",
+    "area": "ミズカ エリア",
+    "default_rooms": 2,
+    "time_per_room": 90,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "501",
+        "time": 90
+      },
+      {
+        "room": "502",
+        "time": 90
+      }
+    ]
+  },
+  {
+    "name": "ZONK出会い橋",
+    "area": "ZONK エリア",
+    "default_rooms": 65,
+    "time_per_room": 63,
+    "color": "#3b82f6",
+    "bg": "#dbeafe",
+    "rooms": [
+      {
+        "room": "201",
+        "time": 30
+      },
+      {
+        "room": "202",
+        "time": 70
+      },
+      {
+        "room": "203",
+        "time": 70
+      },
+      {
+        "room": "204",
+        "time": 30
+      },
+      {
+        "room": "205",
+        "time": 50
+      },
+      {
+        "room": "206",
+        "time": 50
+      },
+      {
+        "room": "207",
+        "time": 80
+      },
+      {
+        "room": "208",
+        "time": 80
+      },
+      {
+        "room": "209",
+        "time": 80
+      },
+      {
+        "room": "210",
+        "time": 80
+      },
+      {
+        "room": "211",
+        "time": 80
+      },
+      {
+        "room": "301",
+        "time": 30
+      },
+      {
+        "room": "302",
+        "time": 70
+      },
+      {
+        "room": "303",
+        "time": 70
+      },
+      {
+        "room": "304",
+        "time": 30
+      },
+      {
+        "room": "305",
+        "time": 50
+      },
+      {
+        "room": "306",
+        "time": 50
+      },
+      {
+        "room": "307",
+        "time": 80
+      },
+      {
+        "room": "308",
+        "time": 80
+      },
+      {
+        "room": "309",
+        "time": 80
+      },
+      {
+        "room": "310",
+        "time": 80
+      },
+      {
+        "room": "311",
+        "time": 80
+      },
+      {
+        "room": "401",
+        "time": 30
+      },
+      {
+        "room": "402",
+        "time": 70
+      },
+      {
+        "room": "403",
+        "time": 70
+      },
+      {
+        "room": "404",
+        "time": 30
+      },
+      {
+        "room": "405",
+        "time": 50
+      },
+      {
+        "room": "406",
+        "time": 50
+      },
+      {
+        "room": "407",
+        "time": 80
+      },
+      {
+        "room": "408",
+        "time": 80
+      },
+      {
+        "room": "409",
+        "time": 80
+      },
+      {
+        "room": "410",
+        "time": 80
+      },
+      {
+        "room": "411",
+        "time": 80
+      },
+      {
+        "room": "501",
+        "time": 30
+      },
+      {
+        "room": "502",
+        "time": 70
+      },
+      {
+        "room": "503",
+        "time": 70
+      },
+      {
+        "room": "504",
+        "time": 30
+      },
+      {
+        "room": "505",
+        "time": 50
+      },
+      {
+        "room": "506",
+        "time": 50
+      },
+      {
+        "room": "507",
+        "time": 80
+      },
+      {
+        "room": "508",
+        "time": 80
+      },
+      {
+        "room": "509",
+        "time": 80
+      },
+      {
+        "room": "510",
+        "time": 80
+      },
+      {
+        "room": "511",
+        "time": 80
+      },
+      {
+        "room": "601",
+        "time": 30
+      },
+      {
+        "room": "602",
+        "time": 70
+      },
+      {
+        "room": "603",
+        "time": 70
+      },
+      {
+        "room": "604",
+        "time": 30
+      },
+      {
+        "room": "605",
+        "time": 50
+      },
+      {
+        "room": "606",
+        "time": 50
+      },
+      {
+        "room": "607",
+        "time": 80
+      },
+      {
+        "room": "608",
+        "time": 80
+      },
+      {
+        "room": "609",
+        "time": 80
+      },
+      {
+        "room": "610",
+        "time": 80
+      },
+      {
+        "room": "611",
+        "time": 80
+      },
+      {
+        "room": "701",
+        "time": 30
+      },
+      {
+        "room": "702",
+        "time": 70
+      },
+      {
+        "room": "703",
+        "time": 70
+      },
+      {
+        "room": "704",
+        "time": 30
+      },
+      {
+        "room": "705",
+        "time": 50
+      },
+      {
+        "room": "706",
+        "time": 50
+      },
+      {
+        "room": "707",
+        "time": 80
+      },
+      {
+        "room": "708",
+        "time": 80
+      },
+      {
+        "room": "709",
+        "time": 80
+      },
+      {
+        "room": "710",
+        "time": 80
+      }
+    ]
+  },
+  {
+    "name": "Nakasu5",
+    "area": "ZONK エリア",
+    "default_rooms": 8,
+    "time_per_room": 60,
+    "color": "#3b82f6",
+    "bg": "#dbeafe",
+    "rooms": [
+      {
+        "room": "301",
+        "time": 60
+      },
+      {
+        "room": "302",
+        "time": 50
+      },
+      {
+        "room": "303",
+        "time": 50
+      },
+      {
+        "room": "304",
+        "time": 50
+      },
+      {
+        "room": "305",
+        "time": 60
+      },
+      {
+        "room": "306",
+        "time": 50
+      },
+      {
+        "room": "307",
+        "time": 80
+      },
+      {
+        "room": "308",
+        "time": 80
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド対馬小路",
+    "area": "タビクト",
+    "default_rooms": 4,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド高砂A",
+    "area": "タビクト",
+    "default_rooms": 4,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド高砂B",
+    "area": "タビクト",
+    "default_rooms": 4,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド美野島A",
+    "area": "タビクト",
+    "default_rooms": 4,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド古門戸町",
+    "area": "タビクト",
+    "default_rooms": 4,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド住吉A",
+    "area": "タビクト",
+    "default_rooms": 6,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "103",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      },
+      {
+        "room": "203",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド住吉B",
+    "area": "タビクト",
+    "default_rooms": 6,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "103",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      },
+      {
+        "room": "203",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド住吉C",
+    "area": "タビクト",
+    "default_rooms": 6,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "103",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      },
+      {
+        "room": "203",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "町屋春吉",
+    "area": "タビクト",
+    "default_rooms": 1,
+    "time_per_room": 100,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "一軒家",
+        "time": 100
+      }
+    ]
+  },
+  {
+    "name": "町屋奈良屋町1",
+    "area": "タビクト",
+    "default_rooms": 1,
+    "time_per_room": 100,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "一軒家",
+        "time": 100
+      }
+    ]
+  },
+  {
+    "name": "町屋奈良屋町2",
+    "area": "タビクト",
+    "default_rooms": 1,
+    "time_per_room": 100,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "一軒家",
+        "time": 100
+      }
+    ]
+  },
+  {
+    "name": "博多町屋",
+    "area": "タビクト",
+    "default_rooms": 1,
+    "time_per_room": 100,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "一軒家",
+        "time": 100
+      }
+    ]
+  },
+  {
+    "name": "コンフォート博多",
+    "area": "あなぶき",
+    "default_rooms": 12,
+    "time_per_room": 80,
+    "color": "#ec4899",
+    "bg": "#fce7f3",
+    "rooms": [
+      {
+        "room": "202",
+        "time": 80
+      },
+      {
+        "room": "203",
+        "time": 80
+      },
+      {
+        "room": "204",
+        "time": 80
+      },
+      {
+        "room": "205",
+        "time": 80
+      },
+      {
+        "room": "206",
+        "time": 80
+      },
+      {
+        "room": "207",
+        "time": 80
+      },
+      {
+        "room": "208",
+        "time": 80
+      },
+      {
+        "room": "209",
+        "time": 80
+      },
+      {
+        "room": "210",
+        "time": 80
+      },
+      {
+        "room": "211",
+        "time": 80
+      },
+      {
+        "room": "212",
+        "time": 80
+      },
+      {
+        "room": "213",
+        "time": 80
+      }
+    ]
+  },
+  {
+    "name": "アルファベットイン大濠",
+    "area": "あなぶき",
+    "default_rooms": 9,
+    "time_per_room": 80,
+    "color": "#ec4899",
+    "bg": "#fce7f3",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 80
+      },
+      {
+        "room": "201",
+        "time": 80
+      },
+      {
+        "room": "202",
+        "time": 80
+      },
+      {
+        "room": "301",
+        "time": 80
+      },
+      {
+        "room": "302",
+        "time": 80
+      },
+      {
+        "room": "401",
+        "time": 80
+      },
+      {
+        "room": "402",
+        "time": 80
+      },
+      {
+        "room": "501",
+        "time": 80
+      },
+      {
+        "room": "502",
+        "time": 80
+      }
+    ]
+  },
+  {
+    "name": "博多駅前",
+    "area": "あなぶき",
+    "default_rooms": 28,
+    "time_per_room": 83,
+    "color": "#ec4899",
+    "bg": "#fce7f3",
+    "rooms": [
+      {
+        "room": "201",
+        "time": 80
+      },
+      {
+        "room": "202",
+        "time": 80
+      },
+      {
+        "room": "203",
+        "time": 80
+      },
+      {
+        "room": "204",
+        "time": 80
+      },
+      {
+        "room": "301",
+        "time": 80
+      },
+      {
+        "room": "302",
+        "time": 80
+      },
+      {
+        "room": "303",
+        "time": 80
+      },
+      {
+        "room": "304",
+        "time": 80
+      },
+      {
+        "room": "401",
+        "time": 80
+      },
+      {
+        "room": "402",
+        "time": 80
+      },
+      {
+        "room": "403",
+        "time": 80
+      },
+      {
+        "room": "404",
+        "time": 80
+      },
+      {
+        "room": "501",
+        "time": 80
+      },
+      {
+        "room": "502",
+        "time": 80
+      },
+      {
+        "room": "503",
+        "time": 80
+      },
+      {
+        "room": "504",
+        "time": 80
+      },
+      {
+        "room": "601",
+        "time": 80
+      },
+      {
+        "room": "602",
+        "time": 80
+      },
+      {
+        "room": "603",
+        "time": 80
+      },
+      {
+        "room": "604",
+        "time": 80
+      },
+      {
+        "room": "701",
+        "time": 80
+      },
+      {
+        "room": "702",
+        "time": 80
+      },
+      {
+        "room": "703",
+        "time": 80
+      },
+      {
+        "room": "704",
+        "time": 80
+      },
+      {
+        "room": "801",
+        "time": 100
+      },
+      {
+        "room": "802",
+        "time": 100
+      },
+      {
+        "room": "901",
+        "time": 100
+      },
+      {
+        "room": "902",
+        "time": 100
+      }
+    ]
+  },
+  {
+    "name": "グランドベース博多",
+    "area": "GB",
+    "default_rooms": 3,
+    "time_per_room": 70,
+    "color": "#6366f1",
+    "bg": "#e0e7ff",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "301",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "グランドベース春吉",
+    "area": "GB",
+    "default_rooms": 8,
+    "time_per_room": 70,
+    "color": "#6366f1",
+    "bg": "#e0e7ff",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      },
+      {
+        "room": "301",
+        "time": 70
+      },
+      {
+        "room": "302",
+        "time": 70
+      },
+      {
+        "room": "401",
+        "time": 70
+      },
+      {
+        "room": "402",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "GB博多門",
+    "area": "GB",
+    "default_rooms": 7,
+    "time_per_room": 70,
+    "color": "#6366f1",
+    "bg": "#e0e7ff",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      },
+      {
+        "room": "301",
+        "time": 70
+      },
+      {
+        "room": "302",
+        "time": 70
+      },
+      {
+        "room": "401",
+        "time": 70
+      },
+      {
+        "room": "402",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "GB博多奈良屋",
+    "area": "GB",
+    "default_rooms": 4,
+    "time_per_room": 78,
+    "color": "#6366f1",
+    "bg": "#e0e7ff",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "301",
+        "time": 70
+      },
+      {
+        "room": "401",
+        "time": 100
+      }
+    ]
+  },
+  {
+    "name": "GB福岡天神",
+    "area": "GB",
+    "default_rooms": 11,
+    "time_per_room": 70,
+    "color": "#6366f1",
+    "bg": "#e0e7ff",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      },
+      {
+        "room": "203",
+        "time": 70
+      },
+      {
+        "room": "301",
+        "time": 70
+      },
+      {
+        "room": "302",
+        "time": 70
+      },
+      {
+        "room": "303",
+        "time": 70
+      },
+      {
+        "room": "401",
+        "time": 70
+      },
+      {
+        "room": "402",
+        "time": 70
+      },
+      {
+        "room": "403",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "エイワプレイス",
+    "area": "GB",
+    "default_rooms": 38,
+    "time_per_room": 48,
+    "color": "#6366f1",
+    "bg": "#e0e7ff",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 45
+      },
+      {
+        "room": "102",
+        "time": 45
+      },
+      {
+        "room": "103",
+        "time": 45
+      },
+      {
+        "room": "104",
+        "time": 45
+      },
+      {
+        "room": "201",
+        "time": 45
+      },
+      {
+        "room": "202",
+        "time": 60
+      },
+      {
+        "room": "203",
+        "time": 45
+      },
+      {
+        "room": "204",
+        "time": 60
+      },
+      {
+        "room": "205",
+        "time": 45
+      },
+      {
+        "room": "206",
+        "time": 45
+      },
+      {
+        "room": "207",
+        "time": 45
+      },
+      {
+        "room": "208",
+        "time": 45
+      },
+      {
+        "room": "209",
+        "time": 45
+      },
+      {
+        "room": "301",
+        "time": 45
+      },
+      {
+        "room": "302",
+        "time": 60
+      },
+      {
+        "room": "303",
+        "time": 45
+      },
+      {
+        "room": "304",
+        "time": 60
+      },
+      {
+        "room": "305",
+        "time": 45
+      },
+      {
+        "room": "306",
+        "time": 45
+      },
+      {
+        "room": "307",
+        "time": 45
+      },
+      {
+        "room": "308",
+        "time": 45
+      },
+      {
+        "room": "309",
+        "time": 45
+      },
+      {
+        "room": "401",
+        "time": 45
+      },
+      {
+        "room": "402",
+        "time": 60
+      },
+      {
+        "room": "403",
+        "time": 45
+      },
+      {
+        "room": "404",
+        "time": 60
+      },
+      {
+        "room": "405",
+        "time": 45
+      },
+      {
+        "room": "406",
+        "time": 45
+      },
+      {
+        "room": "407",
+        "time": 45
+      },
+      {
+        "room": "408",
+        "time": 45
+      },
+      {
+        "room": "501",
+        "time": 45
+      },
+      {
+        "room": "502",
+        "time": 45
+      },
+      {
+        "room": "503",
+        "time": 60
+      },
+      {
+        "room": "504",
+        "time": 45
+      },
+      {
+        "room": "505",
+        "time": 60
+      },
+      {
+        "room": "506",
+        "time": 45
+      },
+      {
+        "room": "507",
+        "time": 45
+      },
+      {
+        "room": "508",
+        "time": 45
+      }
+    ]
+  }
+]
+,
+  hotels: [
+  {
+    "name": "Daimyo1",
+    "area": "ミズカ エリア",
+    "default_rooms": 4,
+    "time_per_room": 60,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "301",
+        "time": 60
+      },
+      {
+        "room": "302",
+        "time": 60
+      },
+      {
+        "room": "303",
+        "time": 60
+      },
+      {
+        "room": "304",
+        "time": 60
+      }
+    ]
+  },
+  {
+    "name": "Daimyo3",
+    "area": "ミズカ エリア",
+    "default_rooms": 4,
+    "time_per_room": 60,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "501",
+        "time": 60
+      },
+      {
+        "room": "502",
+        "time": 60
+      },
+      {
+        "room": "503",
+        "time": 60
+      },
+      {
+        "room": "504",
+        "time": 60
+      }
+    ]
+  }, {
+    "name": "Daimyo6",
+    "area": "ミズカ エリア",
+    "default_rooms": 6,
+    "time_per_room": 60,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "501",
+        "time": 60
+      },
+      {
+        "room": "502",
+        "time": 60
+      },
+      {
+        "room": "503",
+        "time": 60
+      },
+      {
+        "room": "504",
+        "time": 60
+      },
+      {
+        "room": "505",
+        "time": 60
+      },
+      {
+        "room": "506",
+        "time": 60
+      }
+    ]
+  },
+  {
+    "name": "Daimyo7",
+    "area": "ミズカ エリア",
+    "default_rooms": 21,
+    "time_per_room": 52,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 40
+      },
+      {
+        "room": "102",
+        "time": 40
+      },
+      {
+        "room": "103",
+        "time": 60
+      },
+      {
+        "room": "104",
+        "time": 60
+      },
+      {
+        "room": "105",
+        "time": 60
+      },
+      {
+        "room": "201",
+        "time": 40
+      },
+      {
+        "room": "202",
+        "time": 40
+      },
+      {
+        "room": "203",
+        "time": 60
+      },
+      {
+        "room": "204",
+        "time": 60
+      },
+      {
+        "room": "205",
+        "time": 60
+      },
+      {
+        "room": "206",
+        "time": 60
+      },
+      {
+        "room": "301",
+        "time": 40
+      },
+      {
+        "room": "302",
+        "time": 40
+      },
+      {
+        "room": "303",
+        "time": 60
+      },
+      {
+        "room": "304",
+        "time": 60
+      },
+      {
+        "room": "305",
+        "time": 60
+      },
+      {
+        "room": "306",
+        "time": 60
+      },
+      {
+        "room": "401",
+        "time": 70
+      },
+      {
+        "room": "402",
+        "time": 30
+      },
+      {
+        "room": "403",
+        "time": 30
+      },
+      {
+        "room": "404",
+        "time": 60
+      }
+    ]
+  },
+  {
+    "name": "Imaizumi1",
+    "area": "ミズカ エリア",
+    "default_rooms": 2,
+    "time_per_room": 60,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "502",
+        "time": 60
+      },
+      {
+        "room": "505",
+        "time": 60
+      }
+    ]
+  },
+  {
+    "name": "Imaizumi2",
+    "area": "ミズカ エリア",
+    "default_rooms": 8,
+    "time_per_room": 60,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 60
+      },
+      {
+        "room": "102",
+        "time": 60
+      },
+      {
+        "room": "103",
+        "time": 60
+      },
+      {
+        "room": "201",
+        "time": 60
+      },
+      {
+        "room": "202",
+        "time": 60
+      },
+      {
+        "room": "203",
+        "time": 60
+      },
+      {
+        "room": "204",
+        "time": 60
+      },
+      {
+        "room": "205",
+        "time": 60
+      }
+    ]
+  },
+  {
+    "name": "Imaizumi3",
+    "area": "ミズカ エリア",
+    "default_rooms": 3,
+    "time_per_room": 60,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "301",
+        "time": 60
+      },
+      {
+        "room": "401",
+        "time": 60
+      },
+      {
+        "room": "405",
+        "time": 60
+      }
+    ]
+  },
+  {
+    "name": "Imaizumi4",
+    "area": "ミズカ エリア",
+    "default_rooms": 3,
+    "time_per_room": 60,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "301",
+        "time": 60
+      },
+      {
+        "room": "302",
+        "time": 60
+      },
+      {
+        "room": "303",
+        "time": 60
+      }
+    ]
+  },
+  {
+    "name": "Nakasu1（mizuka中州）",
+    "area": "ミズカ エリア",
+    "default_rooms": 2,
+    "time_per_room": 90,
+    "color": "#f59e0b",
+    "bg": "#fef3c7",
+    "rooms": [
+      {
+        "room": "501",
+        "time": 90
+      },
+      {
+        "room": "502",
+        "time": 90
+      }
+    ]
+  },
+  {
+    "name": "ZONK出会い橋",
+    "area": "ZONK エリア",
+    "default_rooms": 65,
+    "time_per_room": 63,
+    "color": "#3b82f6",
+    "bg": "#dbeafe",
+    "rooms": [
+      {
+        "room": "201",
+        "time": 30
+      },
+      {
+        "room": "202",
+        "time": 70
+      },
+      {
+        "room": "203",
+        "time": 70
+      },
+      {
+        "room": "204",
+        "time": 30
+      },
+      {
+        "room": "205",
+        "time": 50
+      },
+      {
+        "room": "206",
+        "time": 50
+      },
+      {
+        "room": "207",
+        "time": 80
+      },
+      {
+        "room": "208",
+        "time": 80
+      },
+      {
+        "room": "209",
+        "time": 80
+      },
+      {
+        "room": "210",
+        "time": 80
+      },
+      {
+        "room": "211",
+        "time": 80
+      },
+      {
+        "room": "301",
+        "time": 30
+      },
+      {
+        "room": "302",
+        "time": 70
+      },
+      {
+        "room": "303",
+        "time": 70
+      },
+      {
+        "room": "304",
+        "time": 30
+      },
+      {
+        "room": "305",
+        "time": 50
+      },
+      {
+        "room": "306",
+        "time": 50
+      },
+      {
+        "room": "307",
+        "time": 80
+      },
+      {
+        "room": "308",
+        "time": 80
+      },
+      {
+        "room": "309",
+        "time": 80
+      },
+      {
+        "room": "310",
+        "time": 80
+      },
+      {
+        "room": "311",
+        "time": 80
+      },
+      {
+        "room": "401",
+        "time": 30
+      },
+      {
+        "room": "402",
+        "time": 70
+      },
+      {
+        "room": "403",
+        "time": 70
+      },
+      {
+        "room": "404",
+        "time": 30
+      },
+      {
+        "room": "405",
+        "time": 50
+      },
+      {
+        "room": "406",
+        "time": 50
+      },
+      {
+        "room": "407",
+        "time": 80
+      },
+      {
+        "room": "408",
+        "time": 80
+      },
+      {
+        "room": "409",
+        "time": 80
+      },
+      {
+        "room": "410",
+        "time": 80
+      },
+      {
+        "room": "411",
+        "time": 80
+      },
+      {
+        "room": "501",
+        "time": 30
+      },
+      {
+        "room": "502",
+        "time": 70
+      },
+      {
+        "room": "503",
+        "time": 70
+      },
+      {
+        "room": "504",
+        "time": 30
+      },
+      {
+        "room": "505",
+        "time": 50
+      },
+      {
+        "room": "506",
+        "time": 50
+      },
+      {
+        "room": "507",
+        "time": 80
+      },
+      {
+        "room": "508",
+        "time": 80
+      },
+      {
+        "room": "509",
+        "time": 80
+      },
+      {
+        "room": "510",
+        "time": 80
+      },
+      {
+        "room": "511",
+        "time": 80
+      },
+      {
+        "room": "601",
+        "time": 30
+      },
+      {
+        "room": "602",
+        "time": 70
+      },
+      {
+        "room": "603",
+        "time": 70
+      },
+      {
+        "room": "604",
+        "time": 30
+      },
+      {
+        "room": "605",
+        "time": 50
+      },
+      {
+        "room": "606",
+        "time": 50
+      },
+      {
+        "room": "607",
+        "time": 80
+      },
+      {
+        "room": "608",
+        "time": 80
+      },
+      {
+        "room": "609",
+        "time": 80
+      },
+      {
+        "room": "610",
+        "time": 80
+      },
+      {
+        "room": "611",
+        "time": 80
+      },
+      {
+        "room": "701",
+        "time": 30
+      },
+      {
+        "room": "702",
+        "time": 70
+      },
+      {
+        "room": "703",
+        "time": 70
+      },
+      {
+        "room": "704",
+        "time": 30
+      },
+      {
+        "room": "705",
+        "time": 50
+      },
+      {
+        "room": "706",
+        "time": 50
+      },
+      {
+        "room": "707",
+        "time": 80
+      },
+      {
+        "room": "708",
+        "time": 80
+      },
+      {
+        "room": "709",
+        "time": 80
+      },
+      {
+        "room": "710",
+        "time": 80
+      }
+    ]
+  },
+  {
+    "name": "Nakasu5",
+    "area": "ZONK エリア",
+    "default_rooms": 8,
+    "time_per_room": 60,
+    "color": "#3b82f6",
+    "bg": "#dbeafe",
+    "rooms": [
+      {
+        "room": "301",
+        "time": 60
+      },
+      {
+        "room": "302",
+        "time": 50
+      },
+      {
+        "room": "303",
+        "time": 50
+      },
+      {
+        "room": "304",
+        "time": 50
+      },
+      {
+        "room": "305",
+        "time": 60
+      },
+      {
+        "room": "306",
+        "time": 50
+      },
+      {
+        "room": "307",
+        "time": 80
+      },
+      {
+        "room": "308",
+        "time": 80
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド対馬小路",
+    "area": "タビクト",
+    "default_rooms": 4,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド高砂A",
+    "area": "タビクト",
+    "default_rooms": 4,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド高砂B",
+    "area": "タビクト",
+    "default_rooms": 4,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド美野島A",
+    "area": "タビクト",
+    "default_rooms": 4,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド古門戸町",
+    "area": "タビクト",
+    "default_rooms": 4,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド住吉A",
+    "area": "タビクト",
+    "default_rooms": 6,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "103",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      },
+      {
+        "room": "203",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド住吉B",
+    "area": "タビクト",
+    "default_rooms": 6,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "103",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      },
+      {
+        "room": "203",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "トリップポッド住吉C",
+    "area": "タビクト",
+    "default_rooms": 6,
+    "time_per_room": 70,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "103",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      },
+      {
+        "room": "203",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "町屋春吉",
+    "area": "タビクト",
+    "default_rooms": 1,
+    "time_per_room": 100,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "一軒家",
+        "time": 100
+      }
+    ]
+  },
+  {
+    "name": "町屋奈良屋町1",
+    "area": "タビクト",
+    "default_rooms": 1,
+    "time_per_room": 100,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "一軒家",
+        "time": 100
+      }
+    ]
+  },
+  {
+    "name": "町屋奈良屋町2",
+    "area": "タビクト",
+    "default_rooms": 1,
+    "time_per_room": 100,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "一軒家",
+        "time": 100
+      }
+    ]
+  },
+  {
+    "name": "博多町屋",
+    "area": "タビクト",
+    "default_rooms": 1,
+    "time_per_room": 100,
+    "color": "#22c55e",
+    "bg": "#dcfce7",
+    "rooms": [
+      {
+        "room": "一軒家",
+        "time": 100
+      }
+    ]
+  },
+  {
+    "name": "コンフォート博多",
+    "area": "あなぶき",
+    "default_rooms": 12,
+    "time_per_room": 80,
+    "color": "#ec4899",
+    "bg": "#fce7f3",
+    "rooms": [
+      {
+        "room": "202",
+        "time": 80
+      },
+      {
+        "room": "203",
+        "time": 80
+      },
+      {
+        "room": "204",
+        "time": 80
+      },
+      {
+        "room": "205",
+        "time": 80
+      },
+      {
+        "room": "206",
+        "time": 80
+      },
+      {
+        "room": "207",
+        "time": 80
+      },
+      {
+        "room": "208",
+        "time": 80
+      },
+      {
+        "room": "209",
+        "time": 80
+      },
+      {
+        "room": "210",
+        "time": 80
+      },
+      {
+        "room": "211",
+        "time": 80
+      },
+      {
+        "room": "212",
+        "time": 80
+      },
+      {
+        "room": "213",
+        "time": 80
+      }
+    ]
+  },
+  {
+    "name": "アルファベットイン大濠",
+    "area": "あなぶき",
+    "default_rooms": 9,
+    "time_per_room": 80,
+    "color": "#ec4899",
+    "bg": "#fce7f3",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 80
+      },
+      {
+        "room": "201",
+        "time": 80
+      },
+      {
+        "room": "202",
+        "time": 80
+      },
+      {
+        "room": "301",
+        "time": 80
+      },
+      {
+        "room": "302",
+        "time": 80
+      },
+      {
+        "room": "401",
+        "time": 80
+      },
+      {
+        "room": "402",
+        "time": 80
+      },
+      {
+        "room": "501",
+        "time": 80
+      },
+      {
+        "room": "502",
+        "time": 80
+      }
+    ]
+  },
+  {
+    "name": "博多駅前",
+    "area": "あなぶき",
+    "default_rooms": 28,
+    "time_per_room": 83,
+    "color": "#ec4899",
+    "bg": "#fce7f3",
+    "rooms": [
+      {
+        "room": "201",
+        "time": 80
+      },
+      {
+        "room": "202",
+        "time": 80
+      },
+      {
+        "room": "203",
+        "time": 80
+      },
+      {
+        "room": "204",
+        "time": 80
+      },
+      {
+        "room": "301",
+        "time": 80
+      },
+      {
+        "room": "302",
+        "time": 80
+      },
+      {
+        "room": "303",
+        "time": 80
+      },
+      {
+        "room": "304",
+        "time": 80
+      },
+      {
+        "room": "401",
+        "time": 80
+      },
+      {
+        "room": "402",
+        "time": 80
+      },
+      {
+        "room": "403",
+        "time": 80
+      },
+      {
+        "room": "404",
+        "time": 80
+      },
+      {
+        "room": "501",
+        "time": 80
+      },
+      {
+        "room": "502",
+        "time": 80
+      },
+      {
+        "room": "503",
+        "time": 80
+      },
+      {
+        "room": "504",
+        "time": 80
+      },
+      {
+        "room": "601",
+        "time": 80
+      },
+      {
+        "room": "602",
+        "time": 80
+      },
+      {
+        "room": "603",
+        "time": 80
+      },
+      {
+        "room": "604",
+        "time": 80
+      },
+      {
+        "room": "701",
+        "time": 80
+      },
+      {
+        "room": "702",
+        "time": 80
+      },
+      {
+        "room": "703",
+        "time": 80
+      },
+      {
+        "room": "704",
+        "time": 80
+      },
+      {
+        "room": "801",
+        "time": 100
+      },
+      {
+        "room": "802",
+        "time": 100
+      },
+      {
+        "room": "901",
+        "time": 100
+      },
+      {
+        "room": "902",
+        "time": 100
+      }
+    ]
+  },
+  {
+    "name": "グランドベース博多",
+    "area": "GB",
+    "default_rooms": 3,
+    "time_per_room": 70,
+    "color": "#6366f1",
+    "bg": "#e0e7ff",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "301",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "グランドベース春吉",
+    "area": "GB",
+    "default_rooms": 8,
+    "time_per_room": 70,
+    "color": "#6366f1",
+    "bg": "#e0e7ff",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      },
+      {
+        "room": "301",
+        "time": 70
+      },
+      {
+        "room": "302",
+        "time": 70
+      },
+      {
+        "room": "401",
+        "time": 70
+      },
+      {
+        "room": "402",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "GB博多門",
+    "area": "GB",
+    "default_rooms": 7,
+    "time_per_room": 70,
+    "color": "#6366f1",
+    "bg": "#e0e7ff",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      },
+      {
+        "room": "301",
+        "time": 70
+      },
+      {
+        "room": "302",
+        "time": 70
+      },
+      {
+        "room": "401",
+        "time": 70
+      },
+      {
+        "room": "402",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "GB博多奈良屋",
+    "area": "GB",
+    "default_rooms": 4,
+    "time_per_room": 78,
+    "color": "#6366f1",
+    "bg": "#e0e7ff",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "301",
+        "time": 70
+      },
+      {
+        "room": "401",
+        "time": 100
+      }
+    ]
+  },
+  {
+    "name": "GB福岡天神",
+    "area": "GB",
+    "default_rooms": 11,
+    "time_per_room": 70,
+    "color": "#6366f1",
+    "bg": "#e0e7ff",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 70
+      },
+      {
+        "room": "102",
+        "time": 70
+      },
+      {
+        "room": "201",
+        "time": 70
+      },
+      {
+        "room": "202",
+        "time": 70
+      },
+      {
+        "room": "203",
+        "time": 70
+      },
+      {
+        "room": "301",
+        "time": 70
+      },
+      {
+        "room": "302",
+        "time": 70
+      },
+      {
+        "room": "303",
+        "time": 70
+      },
+      {
+        "room": "401",
+        "time": 70
+      },
+      {
+        "room": "402",
+        "time": 70
+      },
+      {
+        "room": "403",
+        "time": 70
+      }
+    ]
+  },
+  {
+    "name": "エイワプレイス",
+    "area": "GB",
+    "default_rooms": 38,
+    "time_per_room": 48,
+    "color": "#6366f1",
+    "bg": "#e0e7ff",
+    "rooms": [
+      {
+        "room": "101",
+        "time": 45
+      },
+      {
+        "room": "102",
+        "time": 45
+      },
+      {
+        "room": "103",
+        "time": 45
+      },
+      {
+        "room": "104",
+        "time": 45
+      },
+      {
+        "room": "201",
+        "time": 45
+      },
+      {
+        "room": "202",
+        "time": 60
+      },
+      {
+        "room": "203",
+        "time": 45
+      },
+      {
+        "room": "204",
+        "time": 60
+      },
+      {
+        "room": "205",
+        "time": 45
+      },
+      {
+        "room": "206",
+        "time": 45
+      },
+      {
+        "room": "207",
+        "time": 45
+      },
+      {
+        "room": "208",
+        "time": 45
+      },
+      {
+        "room": "209",
+        "time": 45
+      },
+      {
+        "room": "301",
+        "time": 45
+      },
+      {
+        "room": "302",
+        "time": 60
+      },
+      {
+        "room": "303",
+        "time": 45
+      },
+      {
+        "room": "304",
+        "time": 60
+      },
+      {
+        "room": "305",
+        "time": 45
+      },
+      {
+        "room": "306",
+        "time": 45
+      },
+      {
+        "room": "307",
+        "time": 45
+      },
+      {
+        "room": "308",
+        "time": 45
+      },
+      {
+        "room": "309",
+        "time": 45
+      },
+      {
+        "room": "401",
+        "time": 45
+      },
+      {
+        "room": "402",
+        "time": 60
+      },
+      {
+        "room": "403",
+        "time": 45
+      },
+      {
+        "room": "404",
+        "time": 60
+      },
+      {
+        "room": "405",
+        "time": 45
+      },
+      {
+        "room": "406",
+        "time": 45
+      },
+      {
+        "room": "407",
+        "time": 45
+      },
+      {
+        "room": "408",
+        "time": 45
+      },
+      {
+        "room": "501",
+        "time": 45
+      },
+      {
+        "room": "502",
+        "time": 45
+      },
+      {
+        "room": "503",
+        "time": 60
+      },
+      {
+        "room": "504",
+        "time": 45
+      },
+      {
+        "room": "505",
+        "time": 60
+      },
+      {
+        "room": "506",
+        "time": 45
+      },
+      {
+        "room": "507",
+        "time": 45
+      },
+      {
+        "room": "508",
+        "time": 45
+      }
+    ]
+  }
+]
+};
+
+let dates = [];
+let sharedData = { submissions: [], staffAvailability: {} };
+let adminData = { dailyRooms: {}, dailySpecialTasks: {}, generatedSchedule: {} };
+let finalizedData = null;
+let masterData = null;
+let isUnlocked = false;
+let currentSubmissionArea = '';
+let currentRoomsArea = '';
+let currentScheduleArea = '';
+let currentSettingsArea = '';
+let currentSpecialTaskArea = '';
+let editingStaffIndex = -1;
+let editingAreaName = '';
+let editingHotelIndex = -1;
+let editingRoomHotelIndex = -1;
+
+function init() {
+  // 開始日をlocalStorageから復元（なければ今週月曜日）
+  const savedStartDate = localStorage.getItem('shift_start_date');
+  if (savedStartDate) {
+    document.getElementById('startDate').value = savedStartDate;
+  } else {
+    const today = new Date();
+    const day = today.getDay();
+    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+    document.getElementById('startDate').value = new Date(today.setDate(diff)).toISOString().split('T')[0];
+  }
+  document.getElementById('passwordInput').addEventListener('keypress', e => { if (e.key === 'Enter') checkPassword(); });
+  // 開始日変更時に保存・再生成・Google Sheetsに反映
+  document.getElementById('startDate').addEventListener('change', () => {
+    const newDate = document.getElementById('startDate').value;
+    localStorage.setItem('shift_start_date', newDate);
+    generateDates();
+    render();
+    // Google Sheetsに開始日を含む設定を反映
+    syncStartDateToSheet(newDate);
+    showMessage('開始日を変更しました（フォーム・確定シフトにも反映されます）', 'success');
+  });
+  loadData();
+  generateDates();
+  const areas = Object.keys(masterData.areas);
+  if (areas.length) currentSubmissionArea = currentRoomsArea = currentScheduleArea = currentSettingsArea = currentSpecialTaskArea = areas[0];
+  render();
+}
+
+// 開始日をGoogle Sheetsに反映（確定データの開始日だけ更新）
+async function syncStartDateToSheet(newDate) {
+  const syncSpan = document.getElementById('startDateSync');
+  if (syncSpan) syncSpan.innerHTML = '<span style="color:#f59e0b;">⏳ 反映中...</span>';
+  try {
+    const syncData = finalizedData ? JSON.parse(JSON.stringify(finalizedData)) : {
+      schedule: {}, hotelAssignment: {}, areas: JSON.parse(JSON.stringify(masterData.areas)),
+      holidays: JSON.parse(JSON.stringify(masterData.holidays))
+    };
+    syncData.startDate = newDate;
+    syncData.finalizedAt = syncData.finalizedAt || new Date().toISOString();
+
+    await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'finalize', scheduleData: JSON.stringify(syncData), timestamp: new Date().toISOString() })
+    });
+    if (finalizedData) {
+      finalizedData.startDate = newDate;
+      localStorage.setItem(FINALIZED_STORAGE_KEY, JSON.stringify(finalizedData));
+    }
+    if (syncSpan) syncSpan.innerHTML = '<span style="color:#16a34a;">✅ フォーム・シフト確認に反映済</span>';
+    setTimeout(() => { if (syncSpan) syncSpan.textContent = ''; }, 5000);
+  } catch (e) {
+    if (syncSpan) syncSpan.innerHTML = '<span style="color:#dc2626;">⚠ オフライン（ローカルのみ保存）</span>';
+  }
+}
+
+function generateDates() {
+  dates = [];
+  const start = new Date(document.getElementById('startDate').value);
+  for (let i = 0; i < 14; i++) { const d = new Date(start); d.setDate(start.getDate() + i); dates.push(d.toISOString().split('T')[0]); }
+}
+
+function loadData() {
+  try { const m = localStorage.getItem(MASTER_STORAGE_KEY); masterData = m ? JSON.parse(m) : JSON.parse(JSON.stringify(DEFAULT_MASTER)); } catch(e) { masterData = JSON.parse(JSON.stringify(DEFAULT_MASTER)); }
+  if (!masterData.specialTasks) masterData.specialTasks = {};
+  if (!masterData.holidays) masterData.holidays = {};
+  // staffは保存データがあればそちらを優先（チェッカー・行けるホテル変更を保持）
+  // DEFAULT_MASTERに新しいスタッフがいれば追加する
+  if (!masterData.staff || !Object.keys(masterData.staff).length) {
+    masterData.staff = JSON.parse(JSON.stringify(DEFAULT_MASTER.staff));
+  } else {
+    // DEFAULT_MASTERにいて保存データにいないスタッフを追加
+    Object.keys(DEFAULT_MASTER.staff).forEach(area => {
+      if (!masterData.staff[area]) masterData.staff[area] = [];
+      DEFAULT_MASTER.staff[area].forEach(ds => {
+        if (!masterData.staff[area].find(s => s.name === ds.name)) {
+          masterData.staff[area].push(JSON.parse(JSON.stringify(ds)));
+        }
+      });
+    });
+  }
+  // hotelsは保存データがあればそちらを優先（号室削除等の変更を保持）
+  if (!masterData.hotels || !masterData.hotels.length) {
+    masterData.hotels = JSON.parse(JSON.stringify(DEFAULT_MASTER.hotels || []));
+  }
+  if (!adminData.roomActive) adminData.roomActive = {};
+  try { const s = localStorage.getItem(STORAGE_KEY); if (s) sharedData = JSON.parse(s); } catch(e) {}
+  try { const a = localStorage.getItem(ADMIN_STORAGE_KEY); if (a) adminData = JSON.parse(a); } catch(e) {}
+  if (!adminData.dailyRooms) adminData.dailyRooms = {};
+  if (!adminData.dailySpecialTasks) adminData.dailySpecialTasks = {};
+  try { const f = localStorage.getItem(FINALIZED_STORAGE_KEY); if (f) finalizedData = JSON.parse(f); } catch(e) {}
+}
+
+function saveMaster() { localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(masterData)); localStorage.setItem('hotel_shift_master_shared', JSON.stringify(masterData)); }
+function saveAdmin() { localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(adminData)); }
+function saveShared() { localStorage.setItem(STORAGE_KEY, JSON.stringify(sharedData)); }
+function refreshData() { loadData(); generateDates(); render(); showMessage('更新しました', 'success'); }
+function showMessage(t, type) { const m = document.getElementById('message'); m.style.display = 'block'; m.style.background = type === 'success' ? '#dcfce7' : '#fef2f2'; m.style.color = type === 'success' ? '#166534' : '#dc2626'; m.textContent = t; setTimeout(() => m.style.display = 'none', 3000); }
+function showModal(id) { document.getElementById(id).classList.remove('hidden'); if (id === 'authModal') document.getElementById('passwordInput').focus(); }
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function checkPassword() { if (document.getElementById('passwordInput').value === ADMIN_PASSWORD) { isUnlocked = true; closeModal('authModal'); updateViews(); showMessage('ログインしました', 'success'); } else { document.getElementById('authError').style.display = 'block'; } }
+function lockSchedule() { isUnlocked = false; updateViews(); showMessage('ログアウトしました', 'success'); }
+function updateViews() { document.getElementById('scheduleLockedView').classList.toggle('hidden', isUnlocked); document.getElementById('scheduleUnlockedView').classList.toggle('hidden', !isUnlocked); document.getElementById('settingsLockedView').classList.toggle('hidden', isUnlocked); document.getElementById('settingsUnlockedView').classList.toggle('hidden', !isUnlocked); if (isUnlocked) { renderFinalizeStatus(); renderSettings(); } }
+// ========== スプレッドシートからのデータ取込 ==========
+function importFromSpreadsheet() {
+  const rawData = document.getElementById('importData').value.trim();
+  if (!rawData) { alert('データを貼り付けてください'); return; }
+  
+  const lines = rawData.split('\n');
+  if (lines.length < 2) { alert('データが不足しています'); return; }
+  
+  let importCount = 0;
+  const newSubmissions = [];
+  const newAvailability = {};
+  
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split('\t');
+    if (cols.length < 4) continue;
+    
+    const timestamp = cols[0];
+    const area = cols[1];
+    const name = resolveStaffName((cols[2]||'').trim());
+    const datesStr = cols[3];
+    const memo = cols[5] || '';
+    
+    if (!area || !name || !datesStr) continue;
+    
+    const dateList = datesStr.split(',').map(d => d.trim()).filter(d => d);
+    
+    const existingIndex = newSubmissions.findIndex(s => s.area === area && s.name === name);
+    if (existingIndex >= 0) newSubmissions.splice(existingIndex, 1);
+    
+    newSubmissions.push({ area, name, dates: dateList, memo, submittedAt: timestamp });
+    
+    if (!newAvailability[name]) newAvailability[name] = {};
+    dateList.forEach(date => { newAvailability[name][date] = true; });
+    
+    importCount++;
+  }
+  
+  if (importCount === 0) { alert('取り込めるデータがありませんでした'); return; }
+  
+  newSubmissions.forEach(newSub => {
+    const existingIndex = sharedData.submissions.findIndex(s => s.area === newSub.area && s.name === newSub.name);
+    if (existingIndex >= 0) sharedData.submissions[existingIndex] = newSub;
+    else sharedData.submissions.push(newSub);
+  });
+  
+  Object.keys(newAvailability).forEach(name => {
+    if (!sharedData.staffAvailability[name]) sharedData.staffAvailability[name] = {};
+    Object.assign(sharedData.staffAvailability[name], newAvailability[name]);
+  });
+  
+  saveShared();
+  closeModal('importModal');
+  document.getElementById('importData').value = '';
+  render();
+  showMessage(importCount + '件のデータを取り込みました', 'success');
+}
+
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz7_29YMkw5_j9E5Tn4hGYYUcgowTsHd2SnZwl7KsP9g0M8PBtUbrXFjdYZR5j-aofo/exec';
+
+async function finalizeSchedule() {
+  // hotelAssignmentをエリア別に再構成（スタッフ展開用に date > area > hotel > [staff] 形式にする）
+  const rawHA = adminData.generatedHotelAssignment || {};
+  const groupedHA = {};
+  Object.keys(rawHA).forEach(date => {
+    groupedHA[date] = {};
+    (masterData.hotels || []).forEach(h => {
+      const staff = rawHA[date][h.name] || [];
+      if (!groupedHA[date][h.area]) groupedHA[date][h.area] = {};
+      if (staff.length > 0) {
+        groupedHA[date][h.area][h.name] = staff;
+      }
+    });
+  });
+  finalizedData = { schedule: JSON.parse(JSON.stringify(adminData.generatedSchedule)), hotelAssignment: groupedHA, hashigoAssignment: JSON.parse(JSON.stringify(adminData.hashigoAssignment || {})), dailyRooms: JSON.parse(JSON.stringify(adminData.dailyRooms)), dailySpecialTasks: JSON.parse(JSON.stringify(adminData.dailySpecialTasks)), areas: JSON.parse(JSON.stringify(masterData.areas)), specialTasks: JSON.parse(JSON.stringify(masterData.specialTasks)), holidays: JSON.parse(JSON.stringify(masterData.holidays)), startDate: document.getElementById('startDate').value, finalizedAt: new Date().toISOString() }; localStorage.setItem(FINALIZED_STORAGE_KEY, JSON.stringify(finalizedData)); try { await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'finalize', scheduleData: JSON.stringify(finalizedData), timestamp: new Date().toISOString() }) }); showMessage('確定しました！スタッフが閲覧できます', 'success'); } catch (error) { showMessage('確定しました（オフライン）', 'success'); } closeModal('confirmModal'); renderFinalizeStatus();
+}
+function renderFinalizeStatus() { const c = document.getElementById('finalizeStatus'); if (finalizedData?.finalizedAt) { const d = new Date(finalizedData.finalizedAt); c.innerHTML = `<span style="background:#dcfce7;color:#166534;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:bold;">✅ 確定済</span> <span style="color:#6b7280;font-size:13px;margin-left:8px;">最終: ${d.toLocaleDateString('ja-JP')} ${d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span>`; } else { c.innerHTML = `<span style="background:#fef3c7;color:#92400e;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:bold;">⏳ 未確定</span>`; } }
+
+function showPublishModal() {
+  if (!finalizedData || !finalizedData.startDate) {
+    showMessage('先にシフトを確定してください', 'error'); return;
+  }
+  const start = new Date(finalizedData.startDate);
+  const publishDates = finalizedData.publishDates || {};
+  const DAYS = ['日','月','火','水','木','金','土'];
+  let html = '';
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const dateStr = d.toISOString().split('T')[0];
+    const isOn = publishDates[dateStr] !== false; // デフォルトはtrue（確定済みは全公開）
+    const isHol = d.getDay() === 0 || (finalizedData.holidays && finalizedData.holidays[dateStr]);
+    html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:${isHol?'#fef2f2':'#f9fafb'};border-radius:8px;border:1px solid ${isOn?'#86efac':'#e5e7eb'};">
+      <span style="font-size:14px;font-weight:500;">${d.getMonth()+1}/${d.getDate()}（${DAYS[d.getDay()]}）${isHol?'<span style="color:#dc2626;font-size:11px;margin-left:4px;">休</span>':''}</span>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <span style="font-size:12px;color:${isOn?'#166534':'#9ca3af'};">${isOn?'公開中':'非公開'}</span>
+        <input type="checkbox" data-date="${dateStr}" ${isOn?'checked':''} onchange="updatePublishToggle(this)"
+          style="width:18px;height:18px;cursor:pointer;accent-color:#7c3aed;">
+      </label>
+    </div>`;
+  }
+  document.getElementById('publishDateList').innerHTML = html;
+  showModal('publishModal');
+}
+
+function updatePublishToggle(el) {
+  const dateStr = el.dataset.date;
+  const isOn = el.checked;
+  const row = el.closest('div[style]');
+  row.style.borderColor = isOn ? '#86efac' : '#e5e7eb';
+  row.style.background = row.style.background.includes('fef2f2') ? row.style.background : (isOn ? '#f9fafb' : '#f9fafb');
+  el.previousElementSibling.textContent = isOn ? '公開中' : '非公開';
+  el.previousElementSibling.style.color = isOn ? '#166534' : '#9ca3af';
+}
+
+function setAllPublish(val) {
+  document.querySelectorAll('#publishDateList input[type="checkbox"]').forEach(el => {
+    el.checked = val;
+    updatePublishToggle(el);
+  });
+}
+
+function savePublishSettings() {
+  if (!finalizedData) return;
+  const publishDates = {};
+  document.querySelectorAll('#publishDateList input[type="checkbox"]').forEach(el => {
+    publishDates[el.dataset.date] = el.checked;
+  });
+  finalizedData.publishDates = publishDates;
+  localStorage.setItem(FINALIZED_STORAGE_KEY, JSON.stringify(finalizedData));
+  // Google Sheetsにも反映
+  try {
+    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'finalize', scheduleData: JSON.stringify(finalizedData), timestamp: new Date().toISOString() }) });
+  } catch(e) {}
+  closeModal('publishModal');
+  showMessage('公開設定を保存しました', 'success');
+}
+function showMainTab(n) { for (let i = 1; i <= 4; i++) { document.getElementById('mainPanel' + i).classList.toggle('hidden', i !== n); document.getElementById('mainTab' + i).classList.toggle('active', i === n); } if (n === 4) { setTimeout(renderHotelList, 50); } if (n === 2) { renderRoomsAreaTabs(); renderRoomsMatrix(); } }
+function isHoliday(date) { const d = new Date(date); return d.getDay() === 0 || masterData.holidays[date]; }
+function calcRoomRequired(area, rooms) { const data = masterData.areas[area]; if (!data) return 0; return Math.max(0, Math.ceil((rooms * data.time_per_room) / 300)); }
+
+function render() {
+  const areas = Object.keys(masterData.areas);
+  if (!areas.includes(currentSubmissionArea)) currentSubmissionArea = areas[0] || '';
+  if (!areas.includes(currentRoomsArea)) currentRoomsArea = areas[0] || '';
+  if (!areas.includes(currentScheduleArea)) currentScheduleArea = areas[0] || '';
+  if (!areas.includes(currentSettingsArea)) currentSettingsArea = areas[0] || '';
+  if (!areas.includes(currentSpecialTaskArea)) currentSpecialTaskArea = areas[0] || '';
+  renderAreaSummary(); renderSubmissionAreaTabs(); renderSubmissionContent();
+  renderRoomsAreaTabs(); renderRoomsMatrix();
+  renderScheduleAreaTabs(); renderScheduleTable();
+  updateViews();
+}
+
+function renderAreaSummary() { const c = document.getElementById('areaSummary'); c.innerHTML = ''; Object.entries(masterData.areas).forEach(([area, data]) => { const count = sharedData.submissions.filter(s => s.area === area).length; const total = (masterData.staff[area] || []).length; c.innerHTML += `<div style="padding:10px;border-radius:8px;text-align:center;border-left:4px solid ${data.color};background:${data.bg}"><div style="font-size:11px;font-weight:500;">${area.replace(' エリア','')}</div><div style="font-size:18px;font-weight:bold;">${count}/${total}</div></div>`; }); }
+
+function renderSubmissionAreaTabs() { const c = document.getElementById('submissionAreaTabs'); c.innerHTML = ''; Object.entries(masterData.areas).forEach(([area, data]) => { const count = sharedData.submissions.filter(s => s.area === area).length; const btn = document.createElement('button'); btn.className = 'area-tab' + (area === currentSubmissionArea ? ' active' : ''); btn.style.color = data.color; btn.innerHTML = `${area.replace(' エリア','')} <span style="font-size:11px;">(${count})</span>`; btn.onclick = () => { currentSubmissionArea = area; renderSubmissionAreaTabs(); renderSubmissionContent(); }; c.appendChild(btn); }); }
+
+function renderSubmissionContent() { const c = document.getElementById('submissionContent'); const subs = sharedData.submissions.filter(s => s.area === currentSubmissionArea); const areaData = masterData.areas[currentSubmissionArea] || { color: '#666', bg: '#eee' }; if (!subs.length) { c.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:40px;">提出がありません</p>'; return; } let html = `<div style="margin-bottom:8px;font-size:13px;color:#6b7280;">${subs.length}名が提出済み</div>`; subs.forEach((sub, i) => { html += `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:8px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div><span style="color:#9ca3af;margin-right:6px;font-size:12px;">${i+1}.</span><strong style="font-size:14px;">${sub.name}</strong></div><span style="font-weight:bold;color:${areaData.color};">${sub.dates.length}日</span></div><div style="display:flex;flex-wrap:wrap;gap:2px;">`; sub.dates.forEach(date => { const d = new Date(date); const hol = isHoliday(date); html += `<span style="padding:2px 5px;border-radius:4px;font-size:10px;background:${hol?'#fef2f2':areaData.bg};color:${hol?'#dc2626':areaData.color};">${d.getMonth()+1}/${d.getDate()}</span>`; }); html += '</div>'; if (sub.memo) { html += `<div class="memo-text">📝 ${sub.memo}</div>`; } html += '</div>'; }); c.innerHTML = html; }
+
+function renderRoomsAreaTabs() { const c = document.getElementById('roomsAreaTabs'); c.innerHTML = ''; Object.entries(masterData.areas).forEach(([area, data]) => { const btn = document.createElement('button'); btn.className = 'area-tab' + (area === currentRoomsArea ? ' active' : ''); btn.style.color = data.color; btn.textContent = area.replace(' エリア', ''); btn.onclick = () => { currentRoomsArea = area; renderRoomsAreaTabs(); renderRoomsTable(); }; c.appendChild(btn); }); }
+
+function renderRoomsTable() {
+  const area = currentRoomsArea;
+  const areaData = masterData.areas[area];
+  if (!areaData) { document.getElementById('roomsTable').innerHTML = ''; return; }
+  const specialTasks = masterData.specialTasks[area] || [];
+  
+  let html = '<tr><th>日付</th><th>曜日</th><th>客室数</th><th>客室人員</th>';
+  specialTasks.forEach((t, i) => { html += `<th style="background:#f0fdf4;">${t.name}<br><span style="font-size:10px;color:#6b7280;">(人数)</span></th>`; });
+  html += '<th>合計人員</th></tr>';
+  
+  dates.forEach(date => {
+    const d = new Date(date);
+    const hol = isHoliday(date);
+    const roomVal = adminData.dailyRooms?.[date]?.[area] ?? '';
+    const rooms = roomVal !== '' ? roomVal : areaData.default_rooms;
+    const roomReq = calcRoomRequired(area, rooms);
+    let totalReq = roomReq;
+    
+    html += `<tr class="${hol ? 'holiday' : ''}"><td>${d.getMonth()+1}/${d.getDate()}</td>
+      <td class="${hol ? 'holiday-text' : ''}">${DAYS[d.getDay()]}${masterData.holidays[date] ? '㊗' : ''}</td>
+      <td><input type="number" value="${roomVal}" placeholder="${areaData.default_rooms}" style="width:50px;" onchange="updateDailyRooms('${date}','${area}',this.value)"></td>
+      <td style="font-weight:bold;color:${areaData.color};">${roomReq}名</td>`;
+    
+    specialTasks.forEach((t, i) => {
+      const stVal = adminData.dailySpecialTasks?.[date]?.[area]?.[i] ?? '';
+      const stReq = stVal !== '' ? parseInt(stVal) : t.default_required;
+      totalReq += stReq;
+      html += `<td class="special-task-row"><input type="number" value="${stVal}" placeholder="${t.default_required}" style="width:40px;" onchange="updateDailySpecialTask('${date}','${area}',${i},this.value)"></td>`;
+    });
+    
+    html += `<td style="font-weight:bold;font-size:14px;">${totalReq}名</td></tr>`;
+  });
+  
+  document.getElementById('roomsTable').innerHTML = html;
+}
+
+function updateDailyRooms(date, area, value) { if (!adminData.dailyRooms[date]) adminData.dailyRooms[date] = {}; adminData.dailyRooms[date][area] = value === '' ? '' : parseInt(value); saveAdmin(); renderRoomsTable(); }
+function updateDailySpecialTask(date, area, index, value) { if (!adminData.dailySpecialTasks[date]) adminData.dailySpecialTasks[date] = {}; if (!adminData.dailySpecialTasks[date][area]) adminData.dailySpecialTasks[date][area] = {}; adminData.dailySpecialTasks[date][area][index] = value === '' ? '' : parseInt(value); saveAdmin(); renderRoomsTable(); }
+function setDefaultRooms() { adminData.dailyRooms = {}; adminData.dailySpecialTasks = {}; dates.forEach(date => { adminData.dailyRooms[date] = {}; adminData.dailySpecialTasks[date] = {}; Object.entries(masterData.areas).forEach(([area, data]) => { adminData.dailyRooms[date][area] = data.default_rooms; const sts = masterData.specialTasks[area] || []; adminData.dailySpecialTasks[date][area] = {}; sts.forEach((t, i) => { adminData.dailySpecialTasks[date][area][i] = t.default_required; }); }); }); adminData.roomActive = {}; saveAdmin(); renderRoomsMatrix(); showMessage('デフォルト設定しました', 'success'); }
+
+function renderHolidayList() { const c = document.getElementById('holidayList'); c.innerHTML = ''; dates.forEach(date => { const d = new Date(date); const isSun = d.getDay() === 0; const isHol = masterData.holidays[date]; c.innerHTML += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #e2e8f0;${isSun||isHol?'background:#fef2f2':''}"><span>${d.getMonth()+1}/${d.getDate()} (${DAYS[d.getDay()]})${isSun?' <span style="color:#dc2626;">日曜</span>':''}</span>${!isSun ? `<button class="btn-xs ${isHol?'btn-red':'btn-gray'}" onclick="toggleHoliday('${date}')">${isHol?'㊗ 祝日':'通常'}</button>` : ''}</div>`; }); }
+function toggleHoliday(date) { if (masterData.holidays[date]) delete masterData.holidays[date]; else masterData.holidays[date] = true; saveMaster(); renderHolidayList(); render(); }
+
+function renderScheduleAreaTabs() { const c = document.getElementById('scheduleAreaTabs'); c.innerHTML = ''; Object.entries(masterData.areas).forEach(([area, data]) => { const btn = document.createElement('button'); btn.className = 'area-tab' + (area === currentScheduleArea ? ' active' : ''); btn.style.color = data.color; btn.textContent = area.replace(' エリア', ''); btn.onclick = () => { currentScheduleArea = area; renderScheduleAreaTabs(); renderScheduleTable(); }; c.appendChild(btn); }); }
+
+function renderScheduleTable() {
+  const schedule = adminData.generatedSchedule || {};
+  const hotelAssign = adminData.generatedHotelAssignment || {};
+  const surplus = adminData.generatedSurplusStaff || {};
+  const area = currentScheduleArea;
+  const areaData = masterData.areas[area] || { color: '#666', bg: '#eee' };
+  const specialTasks = masterData.specialTasks[area] || [];
+  
+  let html = '<tr><th>日付</th><th>曜日</th><th>必要</th><th>配置</th><th style="min-width:200px;">スタッフ</th><th style="min-width:250px;background:#fef9c3;">🏨 ホテル割り当て</th><th style="width:40px;"></th></tr>';
+  dates.forEach(date => {
+    const d = new Date(date);
+    const hol = isHoliday(date);
+    const assigned = schedule[date]?.[area] || [];
+    const surplusList = surplus[date]?.[area] || [];
+    const roomVal = adminData.dailyRooms?.[date]?.[area];
+    const rooms = roomVal !== undefined && roomVal !== '' ? roomVal : areaData.default_rooms;
+    let totalReq = calcRoomRequired(area, rooms);
+    specialTasks.forEach((t, i) => { const v = adminData.dailySpecialTasks?.[date]?.[area]?.[i]; totalReq += (v !== undefined && v !== '' ? parseInt(v) : t.default_required); });
+    const totalAvail = assigned.length + surplusList.length;
+    const shortage = totalReq - assigned.length;
+    html += `<tr class="${hol?'holiday':''}"><td>${d.getMonth()+1}/${d.getDate()}</td><td class="${hol?'holiday-text':''}">${DAYS[d.getDay()]}${masterData.holidays[date]?'㊗':''}</td><td>${totalReq}</td><td style="${shortage>0?'color:#dc2626;font-weight:bold':'color:#16a34a'}">${assigned.length}${shortage>0?' ⚠️':' ✓'}</td><td style="text-align:left;">`;
+    // ホテル配置済みスタッフ
+    assigned.forEach(name => { html += `<span style="padding:3px 6px;border-radius:4px;font-size:11px;margin:1px;display:inline-block;background:${areaData.bg};color:${areaData.color};">${name}</span>`; });
+    if (shortage > 0) html += `<span style="color:#dc2626;font-size:11px;margin-left:4px;">${shortage}名不足</span>`;
+    // 余剰スタッフ（オレンジ背景で区別）
+    if (surplusList.length > 0) {
+      html += `<div style="margin-top:4px;padding-top:4px;border-top:1px dashed #fb923c;">`;
+      html += `<span style="font-size:10px;color:#ea580c;font-weight:bold;">⚠ 余剰 ${surplusList.length}名:</span> `;
+      surplusList.forEach(name => { html += `<span style="padding:3px 6px;border-radius:4px;font-size:11px;margin:1px;display:inline-block;background:#fff7ed;color:#ea580c;border:1px dashed #fb923c;">${name}</span>`; });
+      html += `</div>`;
+    }
+    html += '</td><td style="text-align:left;padding:6px 8px;background:#fffdf0;">';
+    // ホテル割り当て表示
+    const dayHotel = hotelAssign[date] || {};
+    const areaHotels = (masterData.hotels || []).filter(h => h.area === area);
+    let hasAny = false;
+    areaHotels.forEach(h => {
+      const staff = dayHotel[h.name] || [];
+      if (!staff.length) return;
+      hasAny = true;
+      html += `<div style="margin-bottom:3px;"><span style="font-size:10px;font-weight:bold;color:#92400e;background:#fef3c7;padding:1px 5px;border-radius:4px;">${h.name}</span> `;
+      staff.forEach(name => {
+        const moves = adminData.hashigoAssignment?.[date]?.[area]?.[name] || [];
+        html += `<span style="font-size:11px;padding:2px 5px;background:#fff;border:1px solid #e2e8f0;border-radius:4px;margin:1px;display:inline-block;">${name}</span>`;
+        if (moves.length > 0) {
+          html += `<span style="font-size:10px;color:#0369a1;margin-left:2px;">→${moves.join('→')}</span>`;
+        }
+      });
+      html += '</div>';
+    });
+    if (!hasAny) html += '<span style="color:#9ca3af;font-size:12px;">−</span>';
+    html += `</td><td style="vertical-align:top;"><button class="btn-xs btn-blue" style="white-space:nowrap;" onclick="showEditShiftModal('${date}')">✏️</button></td></tr>`;
+  });
+  document.getElementById('scheduleTable').innerHTML = html;
+  renderCheckerWarnings();
+  renderSurplusWarnings();
+}
+
+// 余剰スタッフ警告を表示
+function renderSurplusWarnings() {
+  let wrap = document.getElementById('surplusWarningsWrap');
+  if (!wrap) {
+    const checker = document.getElementById('checkerWarningsWrap');
+    if (checker) {
+      wrap = document.createElement('div');
+      wrap.id = 'surplusWarningsWrap';
+      checker.parentNode.insertBefore(wrap, checker.nextSibling);
+    } else return;
+  }
+  const surplus = adminData.generatedSurplusStaff || {};
+  const area = currentScheduleArea;
+  const hasSurplus = dates.some(d => (surplus[d]?.[area] || []).length > 0);
+  if (!hasSurplus) { wrap.innerHTML = ''; return; }
+
+  let totalSurplus = 0;
+  dates.forEach(d => { totalSurplus += (surplus[d]?.[area] || []).length; });
+
+  let html = '<div style="background:#fff7ed;border:1px solid #fb923c;border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
+    + '<div style="font-weight:bold;color:#ea580c;margin-bottom:8px;">⚠️ 余剰スタッフがいます（ホテル未割り当て）</div>'
+    + '<div style="font-size:12px;color:#9a3412;margin-bottom:4px;">出勤希望があるがホテル枠が足りず配置できないスタッフです。手動で割り振るか、他エリアへの応援をご検討ください。</div>';
+
+  dates.forEach(d => {
+    const list = surplus[d]?.[area] || [];
+    if (!list.length) return;
+    const dt = new Date(d);
+    html += `<div style="margin-top:6px;padding:6px 8px;background:#fff;border-radius:6px;border:1px solid #fed7aa;">`
+      + `<span style="font-weight:bold;font-size:12px;">${dt.getMonth()+1}/${dt.getDate()}</span> `
+      + `<span style="color:#ea580c;font-size:12px;">余剰 ${list.length}名:</span> `;
+    list.forEach(name => { html += `<span style="font-size:11px;padding:2px 6px;background:#fff7ed;border:1px dashed #fb923c;border-radius:4px;margin:1px;display:inline-block;">${name}</span>`; });
+    html += '</div>';
+  });
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
+// ===== 手動編集機能 =====
+let editingShiftDate = '';
+
+function showEditShiftModal(date) {
+  editingShiftDate = date;
+  const area = currentScheduleArea;
+  const d = new Date(date);
+  document.getElementById('editShiftTitle').textContent = `✏️ ${d.getMonth()+1}/${d.getDate()}（${DAYS[d.getDay()]}） ${area} 手動編集`;
+
+  const schedule = adminData.generatedSchedule || {};
+  const hotelAssign = adminData.generatedHotelAssignment || {};
+  const surplus = adminData.generatedSurplusStaff || {};
+  const assigned = schedule[date]?.[area] || [];
+  const surplusList = surplus[date]?.[area] || [];
+  const dayHotel = hotelAssign[date] || {};
+  const areaHotels = (masterData.hotels || []).filter(h => h.area === area);
+  const areaData = masterData.areas[area] || { color: '#666', bg: '#eee' };
+
+  // スタッフごとのホテル割当を逆引き
+  const staffHotelMap = {};
+  areaHotels.forEach(h => {
+    (dayHotel[h.name] || []).forEach(name => { staffHotelMap[name] = h.name; });
+  });
+
+  let html = '';
+
+  // ── 配置済みスタッフ ──
+  html += '<div style="font-weight:bold;font-size:13px;margin-bottom:8px;">📋 配置済みスタッフ</div>';
+  if (assigned.length === 0 && surplusList.length === 0) {
+    html += '<p style="color:#9ca3af;font-size:13px;padding:8px;">配置なし</p>';
+  }
+  assigned.forEach(name => {
+    const currentHotel = staffHotelMap[name] || '';
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:4px;flex-wrap:wrap;">`;
+    html += `<span style="font-weight:bold;font-size:13px;min-width:100px;">${name}</span>`;
+    html += `<select data-staff="${name}" data-type="hotel" style="flex:1;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;min-width:140px;">`;
+    html += `<option value="">（未割当）</option>`;
+    areaHotels.forEach(h => {
+      html += `<option value="${h.name}" ${currentHotel===h.name?'selected':''}>${h.name}</option>`;
+    });
+    html += `</select>`;
+    html += `<button class="btn-xs btn-red" onclick="removeFromShift('${date}','${name}')">除外</button>`;
+    html += `</div>`;
+  });
+
+  // ── 余剰スタッフ ──
+  if (surplusList.length > 0) {
+    html += '<div style="font-weight:bold;font-size:13px;margin:12px 0 8px;color:#ea580c;">⚠ 余剰スタッフ（未配置）</div>';
+    surplusList.forEach(name => {
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px dashed #fb923c;border-radius:8px;margin-bottom:4px;background:#fff7ed;flex-wrap:wrap;">`;
+      html += `<span style="font-weight:bold;font-size:13px;min-width:100px;color:#ea580c;">${name}</span>`;
+      html += `<select data-staff="${name}" data-type="surplus-hotel" style="flex:1;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;min-width:140px;">`;
+      html += `<option value="">（ホテル選択で配置）</option>`;
+      areaHotels.forEach(h => {
+        html += `<option value="${h.name}">${h.name}</option>`;
+      });
+      html += `</select>`;
+      html += `<button class="btn-xs btn-green" onclick="addSurplusToShift('${date}','${name}')">配置</button>`;
+      html += `</div>`;
+    });
+  }
+
+  // ── ハシゴ（複数物件）設定 ──
+  html += '<div style="font-weight:bold;font-size:13px;margin:16px 0 8px;">🏨 ハシゴ指示（物件移動）</div>';
+  html += '<p style="font-size:11px;color:#6b7280;margin-bottom:8px;">この物件の後、別の物件にも行く指示を追加できます</p>';
+  const hashigo = adminData.hashigoAssignment?.[date]?.[area] || {};
+  assigned.forEach(name => {
+    const moves = hashigo[name] || [];
+    html += `<div style="padding:6px 8px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:4px;">`;
+    html += `<span style="font-size:12px;font-weight:bold;">${name}</span>`;
+    if (moves.length > 0) {
+      html += ` <span style="font-size:11px;color:#0369a1;">→ ${moves.join(' → ')}</span>`;
+    }
+    html += ` <select data-staff="${name}" data-type="hashigo" style="padding:3px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:11px;margin-left:4px;">`;
+    html += `<option value="">＋移動先追加</option>`;
+    (masterData.hotels || []).forEach(h => {
+      html += `<option value="${h.name}">${h.name}（${h.area}）</option>`;
+    });
+    html += `</select>`;
+    html += `<button class="btn-xs btn-blue" style="margin-left:4px;" onclick="addHashigo('${date}','${name}')">追加</button>`;
+    if (moves.length > 0) {
+      html += `<button class="btn-xs btn-gray" style="margin-left:4px;" onclick="clearHashigo('${date}','${name}')">クリア</button>`;
+    }
+    html += `</div>`;
+  });
+
+  // ── エリア外スタッフ追加 ──
+  html += '<div style="font-weight:bold;font-size:13px;margin:16px 0 8px;">＋ スタッフ追加（他エリアから応援）</div>';
+  html += `<div style="display:flex;gap:8px;align-items:flex-end;">`;
+  html += `<select id="addStaffToShiftSelect" style="flex:1;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;">`;
+  html += `<option value="">スタッフを選択...</option>`;
+  Object.entries(masterData.staff).forEach(([a, list]) => {
+    list.forEach(s => {
+      if (!assigned.includes(s.name) && !surplusList.includes(s.name)) {
+        html += `<option value="${a}|||${s.name}">${s.name}（${a}）</option>`;
+      }
+    });
+  });
+  html += `</select>`;
+  html += `<button class="btn btn-green btn-sm" onclick="addStaffToShift('${date}')">追加</button>`;
+  html += `</div>`;
+
+  document.getElementById('editShiftContent').innerHTML = html;
+  showModal('editShiftModal');
+}
+
+function saveShiftEdit() {
+  const date = editingShiftDate;
+  const area = currentScheduleArea;
+  const schedule = adminData.generatedSchedule;
+  const hotelAssign = adminData.generatedHotelAssignment;
+  const assigned = schedule[date]?.[area] || [];
+  const areaHotels = (masterData.hotels || []).filter(h => h.area === area);
+
+  // ホテル割り当て変更を反映
+  const selects = document.querySelectorAll('#editShiftContent select[data-type="hotel"]');
+  selects.forEach(sel => {
+    const name = sel.dataset.staff;
+    const newHotel = sel.value;
+    // 既存割り当てから除去
+    areaHotels.forEach(h => {
+      const arr = hotelAssign[date][h.name];
+      if (arr) {
+        const idx = arr.indexOf(name);
+        if (idx >= 0) arr.splice(idx, 1);
+      }
+    });
+    // 新しいホテルに配置
+    if (newHotel && hotelAssign[date][newHotel]) {
+      hotelAssign[date][newHotel].push(name);
+    }
+  });
+
+  saveAdmin();
+  closeModal('editShiftModal');
+  renderScheduleTable();
+  showMessage('シフトを更新しました', 'success');
+}
+
+function removeFromShift(date, name) {
+  const area = currentScheduleArea;
+  const schedule = adminData.generatedSchedule;
+  const hotelAssign = adminData.generatedHotelAssignment;
+  // scheduleから除去
+  const arr = schedule[date]?.[area];
+  if (arr) { const idx = arr.indexOf(name); if (idx >= 0) arr.splice(idx, 1); }
+  // hotelAssignmentから除去
+  (masterData.hotels || []).forEach(h => {
+    const ha = hotelAssign[date]?.[h.name];
+    if (ha) { const idx = ha.indexOf(name); if (idx >= 0) ha.splice(idx, 1); }
+  });
+  // 余剰に移動
+  if (!adminData.generatedSurplusStaff) adminData.generatedSurplusStaff = {};
+  if (!adminData.generatedSurplusStaff[date]) adminData.generatedSurplusStaff[date] = {};
+  if (!adminData.generatedSurplusStaff[date][area]) adminData.generatedSurplusStaff[date][area] = [];
+  adminData.generatedSurplusStaff[date][area].push(name);
+  saveAdmin();
+  showEditShiftModal(date); // モーダル再描画
+  renderScheduleTable();
+}
+
+function addSurplusToShift(date, name) {
+  const area = currentScheduleArea;
+  const sel = document.querySelector(`#editShiftContent select[data-staff="${CSS.escape(name)}"][data-type="surplus-hotel"]`);
+  const hotelName = sel ? sel.value : '';
+  // 余剰から除去
+  const sl = adminData.generatedSurplusStaff?.[date]?.[area];
+  if (sl) { const idx = sl.indexOf(name); if (idx >= 0) sl.splice(idx, 1); }
+  // scheduleに追加
+  if (!adminData.generatedSchedule[date][area].includes(name)) {
+    adminData.generatedSchedule[date][area].push(name);
+  }
+  // ホテルに配置
+  if (hotelName && adminData.generatedHotelAssignment[date][hotelName]) {
+    adminData.generatedHotelAssignment[date][hotelName].push(name);
+  }
+  saveAdmin();
+  showEditShiftModal(date);
+  renderScheduleTable();
+}
+
+function addStaffToShift(date) {
+  const sel = document.getElementById('addStaffToShiftSelect');
+  if (!sel.value) { alert('スタッフを選択してください'); return; }
+  const [fromArea, name] = sel.value.split('|||');
+  const area = currentScheduleArea;
+  if (!adminData.generatedSchedule[date][area].includes(name)) {
+    adminData.generatedSchedule[date][area].push(name);
+  }
+  // 余剰から除去（もしいれば）
+  const sl = adminData.generatedSurplusStaff?.[date]?.[fromArea];
+  if (sl) { const idx = sl.indexOf(name); if (idx >= 0) sl.splice(idx, 1); }
+  const sl2 = adminData.generatedSurplusStaff?.[date]?.[area];
+  if (sl2) { const idx = sl2.indexOf(name); if (idx >= 0) sl2.splice(idx, 1); }
+  saveAdmin();
+  showEditShiftModal(date);
+  renderScheduleTable();
+}
+
+function addHashigo(date, name) {
+  const area = currentScheduleArea;
+  const sel = document.querySelector(`#editShiftContent select[data-staff="${CSS.escape(name)}"][data-type="hashigo"]`);
+  if (!sel || !sel.value) { alert('移動先を選択してください'); return; }
+  if (!adminData.hashigoAssignment) adminData.hashigoAssignment = {};
+  if (!adminData.hashigoAssignment[date]) adminData.hashigoAssignment[date] = {};
+  if (!adminData.hashigoAssignment[date][area]) adminData.hashigoAssignment[date][area] = {};
+  if (!adminData.hashigoAssignment[date][area][name]) adminData.hashigoAssignment[date][area][name] = [];
+  adminData.hashigoAssignment[date][area][name].push(sel.value);
+  saveAdmin();
+  showEditShiftModal(date);
+  renderScheduleTable();
+}
+
+function clearHashigo(date, name) {
+  const area = currentScheduleArea;
+  if (adminData.hashigoAssignment?.[date]?.[area]?.[name]) {
+    delete adminData.hashigoAssignment[date][area][name];
+  }
+  saveAdmin();
+  showEditShiftModal(date);
+  renderScheduleTable();
+}
+// 各エリアで「どのホテルにチェッカーが何名必要か」を返す
+// 稼働率50%超の場合は必要数を2名に増やす
+function getCheckerRules(date) {
+  // ホテルの稼働率を計算するヘルパー
+  const getOccupancy = (hotelName) => {
+    const hotel = (masterData.hotels||[]).find(h => h.name === hotelName);
+    if (!hotel) return 0;
+    const rooms = hotel.rooms || [];
+    if (!rooms.length) return 0;
+    const activeCount = rooms.filter((_, i) => getRoomActive(date, hotelName, i)).length;
+    return activeCount / rooms.length;
+  };
+
+  const needs2 = (hotelName) => getOccupancy(hotelName) > 0.5;
+
+  // ルール定義: { hotelPattern: 正規表現またはnull(エリア全体), minCount: 最低人数, area: エリア名 }
+  const rules = [
+    // ミズカ: Imaizumi系に1名, Daimyo系に1名, Nakasu系に1名（固定）
+    { label: 'ミズカ Imaizumi', area: 'ミズカ エリア', matchFn: h => /imaizumi/i.test(h), min: 1, max: 1 },
+    { label: 'ミズカ Daimyo',   area: 'ミズカ エリア', matchFn: h => /daimyo/i.test(h),   min: 1, max: 1 },
+    { label: 'ミズカ Nakasu',   area: 'ミズカ エリア', matchFn: h => /nakasu/i.test(h),   min: 1, max: 1 },
+    // タビクト: 住吉か高砂に1〜2名
+    { label: 'タビクト 住吉/高砂', area: 'タビクト', matchFn: h => /住吉|高砂/i.test(h),
+      min: 1, max: (hotelNames) => hotelNames.some(h => needs2(h)) ? 2 : 1 },
+    // GB: エイワプレイスに1〜2名、その他GBに1〜2名
+    { label: 'GB エイワプレイス', area: 'GB', matchFn: h => /エイワ/i.test(h),
+      min: 1, max: (hotelNames) => hotelNames.some(h => needs2(h)) ? 2 : 1 },
+    { label: 'GB その他', area: 'GB', matchFn: h => !/エイワ/i.test(h),
+      min: 1, max: (hotelNames) => hotelNames.some(h => needs2(h)) ? 2 : 1 },
+    // ZONK: 出会い橋に2名固定
+    { label: 'ZONK 出会い橋', area: 'ZONK エリア', matchFn: h => /出会い橋/i.test(h), min: 2, max: 2 },
+    // あなぶき: コンフォート博多駅前に1〜2名
+    { label: 'あなぶき コンフォート/博多駅前', area: 'あなぶき', matchFn: h => /コンフォート|博多駅前/i.test(h),
+      min: 1, max: (hotelNames) => hotelNames.some(h => needs2(h)) ? 2 : 1 },
+  ];
+
+  // 各ルールに対して「対象ホテル一覧」と「必要チェッカー数」を解決して返す
+  return rules.map(rule => {
+    const targetHotels = (masterData.hotels||[])
+      .filter(h => h.area === rule.area && rule.matchFn(h.name))
+      .map(h => h.name);
+    const required = typeof rule.max === 'function' ? rule.max(targetHotels) : rule.max;
+    return { label: rule.label, area: rule.area, targetHotels, required };
+  }).filter(r => r.targetHotels.length > 0);
+}
+
+// チェッカー配置状況をチェックして警告リストを返す
+function checkCheckerWarnings(date, hotelAssignment) {
+  const rules = getCheckerRules(date);
+  const warnings = [];
+
+  rules.forEach(rule => {
+    // 対象ホテルに配置されたスタッフのうちチェッカー（またはリーダー）の数を数える
+    let checkerCount = 0;
+    rule.targetHotels.forEach(hotelName => {
+      const assigned = hotelAssignment[hotelName] || [];
+      assigned.forEach(name => {
+        const staffObj = Object.values(masterData.staff).flat().find(s => s.name === name);
+        if (staffObj && (staffObj.isChecker || staffObj.isLeader)) checkerCount++;
+      });
+    });
+    if (checkerCount < rule.required) {
+      warnings.push({
+        label: rule.label,
+        area: rule.area,
+        hotels: rule.targetHotels,
+        required: rule.required,
+        actual: checkerCount,
+        shortage: rule.required - checkerCount
+      });
+    }
+  });
+  return warnings;
+}
+
+function generateSchedule() {
+  // 配置優先順位:
+  // パス0: チェッカー/リーダーを必須枠に優先配置
+  // パス1: 行けるホテルが1つだけのスタッフをそのホテルに優先配置
+  // パス2: 残りのスタッフを所属エリアの行けるホテルに配置（リーダー→一般）
+  // パス3: 不足ホテルに他エリアの未配置スタッフを補充（リーダー除く）
+  // パス4: 出勤可能だがホテル枠が埋まったスタッフを「余剰」として記録
+  const schedule = {}, hotelAssignment = {};
+  const checkerWarningsAll = {};
+  const surplusStaff = {}; // 余剰スタッフ: { date: { area: [name, ...] } }
+
+  dates.forEach(date => {
+    schedule[date] = {};
+    hotelAssignment[date] = {};
+    surplusStaff[date] = {};
+    Object.keys(masterData.areas).forEach(a => { schedule[date][a] = []; surplusStaff[date][a] = []; });
+    (masterData.hotels||[]).forEach(h => { hotelAssignment[date][h.name] = []; });
+
+    const avail = sharedData.staffAvailability || {};
+    const hasAnyAvail = Object.keys(avail).length > 0;
+    const isAvail = name => !hasAnyAvail || isStaffAvailable(name, date);
+
+    // 各ホテルの必要人数
+    const hotelNeeds = {};
+    (masterData.hotels||[]).forEach(hotel => {
+      const hotelRooms = hotel.rooms || [];
+      let totalMin = 0;
+      if (hotelRooms.length > 0) {
+        hotelRooms.forEach((r, ri) => { if (getRoomActive(date, hotel.name, ri)) totalMin += r.time; });
+      } else {
+        const rv = adminData.hotelDailyRooms?.[date]?.[hotel.name];
+        totalMin = ((rv !== undefined && rv !== '') ? parseInt(rv) : hotel.default_rooms) * hotel.time_per_room;
+      }
+      hotelNeeds[hotel.name] = totalMin > 0 ? Math.ceil(totalMin / 300) : 0;
+    });
+
+    const assignedStaff = new Set();
+    const isCheckerFn = (s) => s.isChecker || s.isLeader;
+
+    // ヘルパー: スタッフをホテルに配置
+    const placeStaff = (s, hotelName, area) => {
+      assignedStaff.add(s.name);
+      hotelAssignment[date][hotelName].push(s.name);
+      if (!schedule[date][area].includes(s.name)) schedule[date][area].push(s.name);
+    };
+
+    // パス0: チェッカー/リーダーを必須枠に優先配置
+    const checkerRules = getCheckerRules(date);
+    checkerRules.forEach(rule => {
+      let placed = 0;
+      const candidates = (masterData.staff[rule.area] || [])
+        .filter(s => isCheckerFn(s) && isAvail(s.name) && !assignedStaff.has(s.name));
+      rule.targetHotels.forEach(hotelName => {
+        if (hotelNeeds[hotelName] <= 0) return;
+        candidates.forEach(s => {
+          if (placed >= rule.required) return;
+          if (assignedStaff.has(s.name)) return;
+          if (!canGoToHotel(s, hotelName)) return;
+          placeStaff(s, hotelName, rule.area);
+          placed++;
+        });
+      });
+    });
+
+    // パス1: 行けるホテルが1つだけのスタッフを優先配置（そこにしか行けない人）
+    Object.keys(masterData.areas).forEach(area => {
+      const areaHotels = (masterData.hotels || []).filter(h => h.area === area);
+      const activeHotels = areaHotels.filter(h => hotelNeeds[h.name] > 0);
+
+      (masterData.staff[area] || []).forEach(s => {
+        if (assignedStaff.has(s.name)) return;
+        if (!isAvail(s.name)) return;
+        // このスタッフが行ける「稼働中」ホテルを数える
+        const canGo = activeHotels.filter(h => canGoToHotel(s, h.name));
+        if (canGo.length === 1) {
+          // 1つしか行けない → そのホテルに優先配置（枠超えてもOK）
+          placeStaff(s, canGo[0].name, area);
+        }
+      });
+    });
+
+    // パス2: 残りのスタッフを所属エリアの行けるホテルに配置（リーダー→一般）
+    Object.keys(masterData.areas).forEach(area => {
+      const staffList = (masterData.staff[area] || [])
+        .filter(s => isAvail(s.name) && !assignedStaff.has(s.name))
+        .sort((a, b) => (b.isLeader ? 1 : 0) - (a.isLeader ? 1 : 0));
+
+      const areaHotels = (masterData.hotels || []).filter(h => h.area === area);
+
+      staffList.forEach(s => {
+        if (assignedStaff.has(s.name)) return;
+        const target = areaHotels.find(h =>
+          canGoToHotel(s, h.name) &&
+          hotelNeeds[h.name] > 0 &&
+          hotelAssignment[date][h.name].length < hotelNeeds[h.name]
+        );
+        if (target) {
+          placeStaff(s, target.name, area);
+        }
+      });
+    });
+
+    // パス3: 不足ホテルに他エリアの未配置スタッフを補充（リーダー除く）
+    (masterData.hotels || []).forEach(hotel => {
+      const shortage = hotelNeeds[hotel.name] - hotelAssignment[date][hotel.name].length;
+      if (shortage <= 0) return;
+
+      const cands = Object.entries(masterData.staff)
+        .filter(([a]) => a !== hotel.area)
+        .flatMap(([a, list]) => list.map(s => ({ ...s, _area: a })))
+        .filter(s =>
+          !s.isLeader &&
+          !assignedStaff.has(s.name) &&
+          isAvail(s.name) &&
+          canGoToHotel(s, hotel.name)
+        );
+
+      let filled = 0;
+      cands.forEach(s => {
+        if (filled >= shortage) return;
+        assignedStaff.add(s.name);
+        hotelAssignment[date][hotel.name].push(s.name);
+        if (!schedule[date][hotel.area].includes(s.name)) schedule[date][hotel.area].push(s.name);
+        if (!schedule[date][s._area].includes(s.name)) schedule[date][s._area].push(s.name);
+        filled++;
+      });
+    });
+
+    // チェッカー警告チェック
+    const warnings = checkCheckerWarnings(date, hotelAssignment[date]);
+    if (warnings.length > 0) checkerWarningsAll[date] = warnings;
+
+    // パス4: 出勤可能だがホテル枠が全て埋まって未配置のスタッフを「余剰」として記録
+    Object.keys(masterData.areas).forEach(area => {
+      (masterData.staff[area] || []).forEach(s => {
+        if (assignedStaff.has(s.name)) return;
+        if (!isAvail(s.name)) return;
+        surplusStaff[date][area].push(s.name);
+      });
+    });
+  });
+
+  adminData.generatedSchedule = schedule;
+  adminData.generatedHotelAssignment = hotelAssignment;
+  adminData.generatedSurplusStaff = surplusStaff;
+  adminData.checkerWarnings = checkerWarningsAll;
+  saveAdmin(); renderScheduleTable(); renderRoomsMatrix(); renderCheckerWarnings();
+  showMessage('シフトを生成しました', 'success');
+}
+
+// チェッカー警告をシフト表の上部に表示
+function renderCheckerWarnings() {
+  const wrap = document.getElementById('checkerWarningsWrap');
+  if (!wrap) return;
+  const warnings = adminData.checkerWarnings || {};
+  const allDates = Object.keys(warnings);
+
+  // 現在表示中のエリアに関係する警告だけ絞り込む
+  const filteredDates = allDates.filter(date =>
+    (warnings[date] || []).some(w => w.area === currentScheduleArea)
+  );
+
+  if (!filteredDates.length) { wrap.innerHTML = ''; return; }
+
+  let html = '<div style="background:#fff7ed;border:1px solid #fb923c;border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
+    + '<div style="font-weight:bold;color:#c2410c;margin-bottom:8px;">⚠️ チェッカー不足の日があります</div>';
+
+  filteredDates.forEach(date => {
+    const d = new Date(date);
+    const dayWarns = (warnings[date] || []).filter(w => w.area === currentScheduleArea);
+    html += '<div style="margin-bottom:6px;padding:6px 8px;background:#fff;border-radius:6px;border:1px solid #fed7aa;">'
+      + '<span style="font-weight:bold;font-size:13px;color:#9a3412;">'
+      + (d.getMonth()+1) + '/' + d.getDate() + '</span> ';
+    dayWarns.forEach(w => {
+      html += '<span style="font-size:12px;color:#c2410c;margin-right:8px;">'
+        + '【' + w.label + '】' + w.actual + '/' + w.required + '名'
+        + (w.shortage > 0 ? ' <span style="color:#dc2626;">(' + w.shortage + '名不足)</span>' : '')
+        + '</span>';
+    });
+    html += '</div>';
+  });
+
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
+function renderSettings() { renderAreaList(); renderSpecialTaskAreaTabs(); renderSpecialTaskList(); renderSettingsAreaTabs(); renderStaffList(); }
+
+function renderAreaList() { const c = document.getElementById('areaList'); c.innerHTML = ''; Object.entries(masterData.areas).forEach(([area, data]) => { const staffCount = (masterData.staff[area] || []).length; c.innerHTML += `<div style="border:2px solid ${data.color};border-radius:10px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><div><span style="font-weight:bold;color:${data.color};">${area}</span> <span style="color:#6b7280;font-size:12px;">(${staffCount}名, 客室${data.default_rooms}室)</span></div><div style="display:flex;gap:4px;"><button class="btn btn-blue btn-xs" onclick="showEditAreaModal('${area}')">編集</button><button class="btn btn-red btn-xs" onclick="deleteArea('${area}')">削除</button></div></div>`; }); }
+
+function showEditAreaModal(area) { editingAreaName = area; const data = masterData.areas[area]; document.getElementById('editAreaName').value = area; document.getElementById('editAreaRooms').value = data.default_rooms; document.getElementById('editAreaTime').value = data.time_per_room; document.getElementById('editAreaColor').value = data.color; showModal('editAreaModal'); }
+function saveAreaEdit() { const newName = document.getElementById('editAreaName').value.trim(); if (!newName) { alert('エリア名を入力してください'); return; } if (newName !== editingAreaName && masterData.areas[newName]) { alert('同じ名前のエリアがあります'); return; } const newRooms = parseInt(document.getElementById('editAreaRooms').value) || 50; const newTime = parseInt(document.getElementById('editAreaTime').value) || 60; const newColor = document.getElementById('editAreaColor').value; const oldStaff = masterData.staff[editingAreaName]; const oldSpecial = masterData.specialTasks[editingAreaName]; delete masterData.areas[editingAreaName]; delete masterData.staff[editingAreaName]; delete masterData.specialTasks[editingAreaName]; masterData.areas[newName] = { color: newColor, bg: COLOR_MAP[newColor] || '#f3f4f6', default_rooms: newRooms, time_per_room: newTime }; masterData.staff[newName] = oldStaff || []; masterData.specialTasks[newName] = oldSpecial || []; sharedData.submissions.forEach(s => { if (s.area === editingAreaName) s.area = newName; }); saveShared(); saveMaster(); closeModal('editAreaModal'); render(); showMessage('エリアを更新しました', 'success'); }
+function addArea() { const name = document.getElementById('newAreaName').value.trim(); if (!name) { alert('エリア名を入力してください'); return; } if (masterData.areas[name]) { alert('同じ名前のエリアがあります'); return; } const rooms = parseInt(document.getElementById('newAreaRooms').value) || 50; const time = parseInt(document.getElementById('newAreaTime').value) || 60; const color = document.getElementById('newAreaColor').value; masterData.areas[name] = { color, bg: COLOR_MAP[color] || '#f3f4f6', default_rooms: rooms, time_per_room: time }; masterData.staff[name] = []; masterData.specialTasks[name] = []; saveMaster(); closeModal('addAreaModal'); currentSettingsArea = currentSpecialTaskArea = name; render(); showMessage('追加しました', 'success'); }
+function deleteArea(area) { if (!confirm(`${area}を削除しますか？`)) return; delete masterData.areas[area]; delete masterData.staff[area]; delete masterData.specialTasks[area]; saveMaster(); render(); showMessage('削除しました', 'success'); }
+
+function renderSpecialTaskAreaTabs() { const c = document.getElementById('specialTaskAreaTabs'); c.innerHTML = ''; Object.entries(masterData.areas).forEach(([area, data]) => { const btn = document.createElement('button'); btn.className = 'area-tab' + (area === currentSpecialTaskArea ? ' active' : ''); btn.style.color = data.color; btn.textContent = area.replace(' エリア', ''); btn.onclick = () => { currentSpecialTaskArea = area; renderSpecialTaskAreaTabs(); renderSpecialTaskList(); }; c.appendChild(btn); }); }
+function renderSpecialTaskList() { const c = document.getElementById('specialTaskList'); const tasks = masterData.specialTasks[currentSpecialTaskArea] || []; if (!tasks.length) { c.innerHTML = '<p style="color:#9ca3af;text-align:center;padding:16px;font-size:13px;">特別作業なし</p>'; return; } let html = ''; tasks.forEach((t, i) => { html += `<div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;background:#f0fdf4;"><input type="text" value="${t.name}" style="flex:1;min-width:80px;" onchange="updateSpecialTaskName(${i},this.value)"><span style="font-size:12px;">人数:</span><input type="number" value="${t.default_required}" style="width:50px;" min="0" onchange="updateSpecialTaskRequired(${i},this.value)"><button class="btn btn-red btn-xs" onclick="deleteSpecialTask(${i})">削除</button></div>`; }); c.innerHTML = html; }
+function showAddSpecialTaskModal() { document.getElementById('newSpecialTaskName').value = ''; document.getElementById('newSpecialTaskRequired').value = '1'; document.getElementById('specialTaskAreaLabel').textContent = '追加先: ' + currentSpecialTaskArea; showModal('addSpecialTaskModal'); }
+function addSpecialTask() {
+  const name = document.getElementById('newSpecialTaskName').value.trim();
+  if (!name) { alert('作業名を入力してください'); return; }
+  const req = parseInt(document.getElementById('newSpecialTaskRequired').value) || 1;
+  const area = currentSpecialTaskArea;
+  if (!masterData.specialTasks[area]) masterData.specialTasks[area] = [];
+  masterData.specialTasks[area].push({ name, default_required: req });
+  saveMaster();
+  closeModal('addSpecialTaskModal');
+  renderSpecialTaskAreaTabs();
+  renderSpecialTaskList();
+  renderSpecialTaskTable();
+  showMessage(area + ' に「' + name + '」を追加しました', 'success');
+}
+function updateSpecialTaskName(i, val) { masterData.specialTasks[currentSpecialTaskArea][i].name = val; saveMaster(); renderSpecialTaskTable(); }
+function updateSpecialTaskRequired(i, val) { masterData.specialTasks[currentSpecialTaskArea][i].default_required = parseInt(val) || 0; saveMaster(); renderSpecialTaskTable(); }
+function deleteSpecialTask(i) { const name = masterData.specialTasks[currentSpecialTaskArea][i].name; masterData.specialTasks[currentSpecialTaskArea].splice(i, 1); saveMaster(); renderSpecialTaskList(); renderSpecialTaskTable(); showMessage('「' + name + '」を削除しました', 'success'); }
+
+function renderSettingsAreaTabs() { const c = document.getElementById('settingsAreaTabs'); c.innerHTML = ''; Object.entries(masterData.areas).forEach(([area, data]) => { const btn = document.createElement('button'); btn.className = 'area-tab' + (area === currentSettingsArea ? ' active' : ''); btn.style.color = data.color; btn.textContent = area.replace(' エリア', ''); btn.onclick = () => { currentSettingsArea = area; renderSettingsAreaTabs(); renderStaffList(); }; c.appendChild(btn); }); }
+function renderStaffList() {
+  const c = document.getElementById('staffList');
+  const staff = masterData.staff[currentSettingsArea] || [];
+  if (!staff.length) { c.innerHTML = '<p style="color:#9ca3af;text-align:center;padding:16px;font-size:13px;">スタッフなし</p>'; return; }
+  const areaData = masterData.areas[currentSettingsArea] || {};
+  // リーダー→チェッカー→一般 の順でソート（表示のみ、masterDataの順は変えない）
+  const sorted = [...staff].sort((a, b) => {
+    const rankA = a.isLeader ? 0 : a.isChecker ? 1 : 2;
+    const rankB = b.isLeader ? 0 : b.isChecker ? 1 : 2;
+    return rankA - rankB;
+  });
+  let html = '';
+  sorted.forEach((s, displayIdx) => {
+    const realIdx = staff.indexOf(s);
+    const hotelBadges = (s.hotels||[]).map(h =>
+      '<span style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:3px;padding:1px 6px;font-size:10px;margin:1px;display:inline-block;">'+h+'</span>'
+    ).join('');
+    html += '<div class="staff-item" style="flex-direction:column;align-items:flex-start;gap:6px;padding:8px 10px;">'
+      + '<div style="display:flex;width:100%;justify-content:space-between;align-items:center;">'
+      + '<div>'
+      + '<span style="color:#9ca3af;width:20px;display:inline-block;font-size:11px;">'+(displayIdx+1)+'</span>'
+      + '<strong style="font-size:13px;">'+s.name+'</strong>'
+      + (s.isLeader ? '<span style="background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:4px;font-size:10px;margin-left:6px;">👑リーダー</span>' : '')
+      + (s.isChecker ? '<span style="background:#ede9fe;color:#6d28d9;padding:1px 5px;border-radius:4px;font-size:10px;margin-left:4px;">🔍チェッカー</span>' : '')
+      + '</div>'
+      + '<div style="display:flex;gap:4px;">'
+      + '<button class="btn btn-blue btn-xs" onclick="showEditStaffModal(\''+currentSettingsArea+'\','+realIdx+')">編集</button>'
+      + '<button class="btn btn-red btn-xs" onclick="deleteStaff(\''+currentSettingsArea+'\','+realIdx+')">削除</button>'
+      + '</div></div>'
+      + (hotelBadges ? '<div style="padding-left:22px;line-height:2;">'+hotelBadges+'</div>' : '<div style="padding-left:22px;font-size:11px;color:#9ca3af;">担当物件未設定</div>')
+      + '</div>';
+  });
+  c.innerHTML = html;
+}
+function showEditStaffModal(area, index) {
+  editingStaffIndex = index;
+  const s = masterData.staff[area][index];
+  document.getElementById('editStaffName').value = s.name;
+  document.getElementById('editStaffRatio').value = s.ratio || 1;
+  document.getElementById('editStaffLeader').checked = s.isLeader || false;
+  if (document.getElementById('editStaffChecker')) {
+    document.getElementById('editStaffChecker').checked = s.isChecker || false;
+  }
+  // ホテルチェックボックス描画
+  const hotelsDiv = document.getElementById('editStaffHotels');
+  if (hotelsDiv) {
+    const allHotels = masterData.hotels || [];
+    const byArea = {};
+    allHotels.forEach(h => { if (!byArea[h.area]) byArea[h.area] = []; byArea[h.area].push(h); });
+    let hhtml = '';
+    Object.entries(byArea).forEach(([areaName, hotels]) => {
+      const aData = masterData.areas[areaName] || {};
+      const isMyArea = areaName === area;
+      hhtml += '<div style="margin-bottom:8px;">'
+        + '<div style="font-size:11px;font-weight:bold;color:' + (aData.color||'#666') + ';margin-bottom:4px;padding:2px 6px;background:' + (aData.bg||'#f3f4f6') + ';border-radius:4px;display:inline-block;">'
+        + areaName.replace(' エリア','') + (isMyArea ? ' ★所属' : '') + '</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+      hotels.forEach(h => {
+        const checked = (s.hotels||[]).includes(h.name) ? 'checked' : '';
+        hhtml += '<label style="display:flex;align-items:center;gap:3px;font-size:12px;padding:2px 6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;cursor:pointer;">'
+          + '<input type="checkbox" name="staffHotel" value="' + h.name + '" ' + checked + '>'
+          + '<span>' + h.name + '</span></label>';
+      });
+      hhtml += '</div></div>';
+    });
+    hotelsDiv.innerHTML = hhtml;
+  }
+  showModal('editStaffModal');
+}
+function saveStaffEdit() {
+  const name = document.getElementById('editStaffName').value.trim();
+  if (!name) { alert('名前を入力してください'); return; }
+  const oldName = masterData.staff[currentSettingsArea][editingStaffIndex].name;
+  const hotels = Array.from(document.querySelectorAll('#editStaffHotels input[name="staffHotel"]:checked')).map(cb => cb.value);
+  masterData.staff[currentSettingsArea][editingStaffIndex] = {
+    name,
+    ratio: 1,
+    isLeader: document.getElementById('editStaffLeader').checked,
+    isChecker: document.getElementById('editStaffChecker') ? document.getElementById('editStaffChecker').checked : false,
+    hotels: hotels
+  };
+  sharedData.submissions.forEach(s => { if (s.name === oldName) s.name = name; });
+  if (sharedData.staffAvailability[oldName]) {
+    sharedData.staffAvailability[name] = sharedData.staffAvailability[oldName];
+    delete sharedData.staffAvailability[oldName];
+  }
+  saveMaster(); saveShared(); closeModal('editStaffModal'); renderStaffList(); render();
+  showMessage('保存しました', 'success');
+}
+
+function addStaff() {
+  const name = document.getElementById('newStaffName').value.trim();
+  if (!name) { alert('名前を入力してください'); return; }
+  if (!masterData.staff[currentSettingsArea]) masterData.staff[currentSettingsArea] = [];
+  const hotels = Array.from(document.querySelectorAll('#addStaffHotels input[name="staffHotel"]:checked')).map(cb => cb.value);
+  masterData.staff[currentSettingsArea].push({
+    name,
+    ratio: 1,
+    isLeader: document.getElementById('newStaffLeader').checked,
+    isChecker: document.getElementById('newStaffChecker') ? document.getElementById('newStaffChecker').checked : false,
+    hotels: hotels
+  });
+  saveMaster();
+  closeModal('addStaffModal');
+  renderStaffList();
+  renderAreaSummary();
+  showMessage('追加しました', 'success');
+}
+function deleteStaff(area, i) { if (!confirm(`${masterData.staff[area][i].name}を削除しますか？`)) return; masterData.staff[area].splice(i, 1); saveMaster(); renderStaffList(); renderAreaSummary(); showMessage('削除しました', 'success'); }
+
+function exportAllData() { const data = { master: masterData, shared: sharedData, admin: adminData, finalized: finalizedData }; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); a.download = 'shift_backup_' + new Date().toISOString().split('T')[0] + '.json'; a.click(); showMessage('エクスポートしました', 'success'); }
+function importAllData(e) { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = ev => { try { const data = JSON.parse(ev.target.result); if (data.master) { masterData = data.master; saveMaster(); } if (data.shared) { sharedData = data.shared; saveShared(); } if (data.admin) { adminData = data.admin; saveAdmin(); } if (data.finalized) { finalizedData = data.finalized; localStorage.setItem(FINALIZED_STORAGE_KEY, JSON.stringify(finalizedData)); } render(); showMessage('インポートしました', 'success'); } catch(err) { alert('読み込み失敗'); } }; reader.readAsText(file); e.target.value = ''; }
+function resetAllData() { if (!confirm('全データをリセットしますか？')) return; if (!confirm('本当にリセットしますか？')) return; localStorage.clear(); location.reload(); }
+function clearAllSubmissions() { if (!confirm('提出データをクリアしますか？')) return; sharedData = { submissions: [], staffAvailability: {} }; saveShared(); render(); showMessage('クリアしました', 'success'); }
+
+function normalizeN(n){return(n||'').replace(/[\s\u3000]/g,'').toLowerCase();}
+function resolveStaffName(inputName){
+  const norm=normalizeN(inputName);
+  for(const list of Object.values(masterData.staff)){for(const s of list){if(normalizeN(s.name)===norm)return s.name;}}
+  for(const list of Object.values(masterData.staff)){for(const s of list){const m2=normalizeN(s.name);if(m2.includes(norm)||norm.includes(m2))return s.name;}}
+  return inputName;
+}
+function isStaffAvailable(staffName,date){
+  // staffAvailabilityから確認
+  if(sharedData.staffAvailability?.[staffName]?.[date])return true;
+  const norm=normalizeN(staffName);
+  for(const[k,avail]of Object.entries(sharedData.staffAvailability||{})){if(normalizeN(k)===norm&&avail[date])return true;}
+  // submissionsからも確認（staffAvailabilityに反映されていないケースをカバー）
+  for(const sub of (sharedData.submissions||[])){
+    if(normalizeN(sub.name)===norm && sub.dates && sub.dates.includes(date))return true;
+  }
+  return false;
+}
+function canGoToHotel(staffObj,hotelName){
+  if(!staffObj||!staffObj.hotels||!staffObj.hotels.length)return false;
+  return staffObj.hotels.some(h=>normalizeN(h)===normalizeN(hotelName));
+}
+function getRoomActive(date,hotelName,roomIndex){
+  const val=adminData.roomActive?.[date]?.[hotelName]?.[roomIndex];
+  return val!==undefined?val:true;
+}
+function setRoomActive(date,hotelName,roomIndex,active){
+  if(!adminData.roomActive)adminData.roomActive={};
+  if(!adminData.roomActive[date])adminData.roomActive[date]={};
+  if(!adminData.roomActive[date][hotelName])adminData.roomActive[date][hotelName]={};
+  adminData.roomActive[date][hotelName][roomIndex]=active;
+  saveAdmin();renderRoomsMatrix();
+}
+function setAllRooms(date,hotelName,active){
+  const hotel=(masterData.hotels||[]).find(h=>h.name===hotelName);if(!hotel)return;
+  if(!adminData.roomActive)adminData.roomActive={};
+  if(!adminData.roomActive[date])adminData.roomActive[date]={};
+  if(!adminData.roomActive[date][hotelName])adminData.roomActive[date][hotelName]={};
+  (hotel.rooms||[]).forEach((_,i)=>{adminData.roomActive[date][hotelName][i]=active;});
+  saveAdmin();renderRoomsMatrix();
+}
+function getHotelDayStats(date,hotel){
+  const rooms=hotel.rooms||[];let totalTime=0;
+  rooms.forEach((r,i)=>{if(getRoomActive(date,hotel.name,i))totalTime+=r.time;});
+  return{totalTime,req:totalTime>0?Math.max(1,Math.ceil(totalTime/300)):0,activeCount:rooms.filter((_,i)=>getRoomActive(date,hotel.name,i)).length};
+}
+function renderRoomsAreaTabs(){
+  const c=document.getElementById('roomsAreaTabs');if(!c)return;c.innerHTML='';
+  Object.entries(masterData.areas).forEach(([area,data])=>{
+    const btn=document.createElement('button');
+    btn.className='area-tab'+(area===currentRoomsArea?' active':'');
+    btn.style.color=data.color;btn.textContent=area.replace(' エリア','');
+    btn.onclick=()=>{currentRoomsArea=area;renderRoomsAreaTabs();renderRoomsMatrix();};
+    c.appendChild(btn);
+  });
+}
+function renderRoomsMatrix(){
+  const wrap=document.getElementById('roomsMatrixWrap');if(!wrap)return;
+  const area=currentRoomsArea;
+  const areaHotels=(masterData.hotels||[]).filter(h=>h.area===area);
+  if(!areaHotels.length){wrap.innerHTML='<p style="color:#9ca3af;text-align:center;padding:32px;">このエリアに物件がありません。設定タブの「物件管理」から追加してください。</p>';return;}
+  if(!window._expandedHotel)window._expandedHotel={};
+  let html='<table style="border-collapse:collapse;font-size:12px;width:100%;"><thead><tr style="background:#f8fafc;"><th style="padding:8px;border:1px solid #e2e8f0;white-space:nowrap;">日付</th><th style="padding:8px;border:1px solid #e2e8f0;">曜日</th>';
+  areaHotels.forEach(h=>{
+    const isExp=window._expandedHotel[h.name];
+    html+=`<th style="padding:5px 8px;border:1px solid #e2e8f0;background:${h.bg};color:${h.color};cursor:pointer;white-space:nowrap;text-align:center;" onclick="toggleHotelExpand('${h.name}')">${h.name}<br><span style="font-size:10px;font-weight:normal;">${(h.rooms||[]).length}室 ${isExp?'▲':'▼'}</span></th>`;
+  });
+  html+='<th colspan="2" style="padding:8px;border:1px solid #e2e8f0;background:#f0f9ff;color:#0369a1;text-align:center;">合計</th></tr></thead><tbody>';
+  dates.forEach(date=>{
+    const d=new Date(date);const hol=isHoliday(date);
+    let dayTotalReq=0,dayTotalAssigned=0;
+    html+=`<tr style="background:${hol?'#fef2f2':'white'};"><td style="padding:6px 8px;border:1px solid #e2e8f0;font-weight:500;white-space:nowrap;">${d.getMonth()+1}/${d.getDate()}</td><td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;${hol?'color:#dc2626;font-weight:bold;':'color:#6b7280;'}">${DAYS[d.getDay()]}${masterData.holidays[date]?'㊗':''}</td>`;
+    areaHotels.forEach(h=>{
+      const stats=getHotelDayStats(date,h);
+      dayTotalReq+=stats.req;dayTotalAssigned+=(adminData.generatedHotelAssignment?.[date]?.[h.name]||[]).length;
+      const isExp=window._expandedHotel[h.name];
+      html+=`<td style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;vertical-align:top;">`;
+      if(!isExp){
+        html+=`<div style="font-weight:bold;color:${stats.req>0?h.color:'#9ca3af'};">${stats.req>0?stats.req+'名':'−'}</div><div style="font-size:10px;color:#6b7280;">${stats.activeCount}/${(h.rooms||[]).length}室</div>`;
+      }else{
+        html+=`<div style="font-weight:bold;color:${stats.req>0?h.color:'#9ca3af'};margin-bottom:3px;">${stats.req>0?stats.req+'名':'−'} (${stats.totalTime}分)</div>`;
+        (h.rooms||[]).forEach((r,ri)=>{
+          const on=getRoomActive(date,h.name,ri);
+          html+=`<label style="display:flex;align-items:center;gap:3px;cursor:pointer;padding:1px 0;font-size:11px;white-space:nowrap;"><input type="checkbox" ${on?'checked':''} onchange="setRoomActive('${date}','${h.name}',${ri},this.checked)" style="cursor:pointer;"><span style="color:${on?'#374151':'#9ca3af'};">${r.room}</span><span style="color:#6b7280;"> ${r.time}分</span></label>`;
+        });
+        html+=`<div style="display:flex;gap:3px;margin-top:3px;"><button style="flex:1;font-size:10px;padding:2px;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:3px;cursor:pointer;" onclick="setAllRooms('${date}','${h.name}',true)">全ON</button><button style="flex:1;font-size:10px;padding:2px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:3px;cursor:pointer;" onclick="setAllRooms('${date}','${h.name}',false)">全OFF</button></div>`;
+      }
+      html+='</td>';
+    });
+    const tc=dayTotalReq===0?'#9ca3af':'#0369a1',ac=dayTotalReq===0?'#9ca3af':(dayTotalAssigned<dayTotalReq?'#dc2626':'#16a34a');
+    html+=`<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;background:#e0f2fe;color:${tc};">${dayTotalReq>0?dayTotalReq+'名':'−'}</td><td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;color:${ac};">${dayTotalReq>0?dayTotalAssigned+'名'+(dayTotalAssigned<dayTotalReq?' ⚠️':' ✓'):'−'}</td></tr>`;
+  });
+  html+='</tbody></table><p style="font-size:11px;color:#9ca3af;text-align:center;margin-top:8px;">▼物件名クリックで部屋別ON/OFFを展開</p>';
+  wrap.innerHTML=html;
+  renderSpecialTaskTable();
+}
+function toggleHotelExpand(name){if(!window._expandedHotel)window._expandedHotel={};window._expandedHotel[name]=!window._expandedHotel[name];renderRoomsMatrix();}
+
+function renderSpecialTaskTable(){
+  const wrap=document.getElementById('specialTaskTableWrap');if(!wrap)return;
+  const area=currentRoomsArea;
+  const specialTasks=masterData.specialTasks[area]||[];
+  if(!specialTasks.length){wrap.innerHTML='';return;}
+
+  let html='<div style="border-top:2px solid #86efac;padding-top:12px;">';
+  html+='<h3 style="font-size:14px;font-weight:bold;color:#166534;margin-bottom:8px;">🧹 特別作業（'+area+'）</h3>';
+  html+='<table style="border-collapse:collapse;font-size:12px;width:100%;"><thead><tr style="background:#f0fdf4;"><th style="padding:6px 8px;border:1px solid #e2e8f0;">日付</th><th style="padding:6px 8px;border:1px solid #e2e8f0;">曜日</th>';
+  specialTasks.forEach(t=>{
+    html+=`<th style="padding:6px 8px;border:1px solid #e2e8f0;background:#f0fdf4;color:#166534;">${t.name}<br><span style="font-size:10px;color:#6b7280;">既定:${t.default_required}名</span></th>`;
+  });
+  html+='<th style="padding:6px 8px;border:1px solid #e2e8f0;background:#f0f9ff;color:#0369a1;">合計</th></tr></thead><tbody>';
+
+  dates.forEach(date=>{
+    const d=new Date(date);const hol=isHoliday(date);
+    let total=0;
+    html+=`<tr style="background:${hol?'#fef2f2':'white'};"><td style="padding:5px 8px;border:1px solid #e2e8f0;font-weight:500;">${d.getMonth()+1}/${d.getDate()}</td><td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;${hol?'color:#dc2626;font-weight:bold;':'color:#6b7280;'}">${DAYS[d.getDay()]}${masterData.holidays[date]?'㊗':''}</td>`;
+    specialTasks.forEach((t,i)=>{
+      const stVal=adminData.dailySpecialTasks?.[date]?.[area]?.[i]??'';
+      const stReq=stVal!==''?parseInt(stVal):t.default_required;
+      total+=stReq;
+      html+=`<td style="padding:4px 6px;border:1px solid #e2e8f0;text-align:center;"><input type="number" value="${stVal}" placeholder="${t.default_required}" style="width:45px;padding:3px;border:1px solid #d1d5db;border-radius:4px;text-align:center;" onchange="updateDailySpecialTask('${date}','${area}',${i},this.value)"></td>`;
+    });
+    html+=`<td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;color:#0369a1;">${total}名</td></tr>`;
+  });
+  html+='</tbody></table></div>';
+  wrap.innerHTML=html;
+}
+function renderHotelList(){
+  const c=document.getElementById('hotelList');
+  if(!c)return;
+  const hotels=masterData.hotels||[];
+  if(!hotels.length){
+    c.innerHTML='<div style="text-align:center;padding:32px;color:#9ca3af;">物件がありません</div>';
+    return;
+  }
+  const rows=hotels.map((h,i)=>{
+    const rooms=h.rooms||[];
+    const totalTime=rooms.reduce((s,r)=>s+r.time,0);
+    const req=totalTime>0?Math.max(1,Math.ceil(totalTime/300)):0;
+    const badges=rooms.slice(0,6).map(r=>
+      '<span style="display:inline-block;background:'+h.bg+';color:'+h.color+';border:1px solid '+h.color+'44;border-radius:4px;padding:2px 7px;font-size:11px;margin:2px;">'+r.room+' <b>'+r.time+'分</b></span>'
+    ).join('')+(rooms.length>6?'<span style="font-size:11px;color:#9ca3af;"> 他'+(rooms.length-6)+'室…</span>':'');
+    return '<div style="border:2px solid '+h.color+';border-radius:10px;padding:12px 14px;margin-bottom:10px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
+      +'<div>'
+      +'<span style="font-weight:bold;color:'+h.color+';font-size:15px;">'+h.name+'</span>'
+      +'<span style="color:#6b7280;font-size:12px;margin-left:8px;">['+h.area+']</span>'
+      +'<span style="margin-left:8px;background:#f0f9ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:4px;padding:2px 8px;font-size:12px;">'+rooms.length+'室 / '+totalTime+'分 → <b>'+req+'名</b></span>'
+      +'</div>'
+      +'<div style="display:flex;gap:6px;flex-shrink:0;">'
+      +'<button style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:bold;cursor:pointer;" onclick="showRoomListModal('+i+')">🛏 号室設定</button>'
+      +'<button class="btn btn-red btn-xs" onclick="deleteHotel('+i+')">削除</button>'
+      +'</div></div>'
+      +'<div style="line-height:2.2;">'+(rooms.length?badges:'<span style="color:#9ca3af;font-size:12px;">号室未設定</span>')+'</div>'
+      +'</div>';
+  });
+  c.innerHTML=rows.join('');
+}
+
+function showAddHotelModal(){const sel=document.getElementById('newHotelArea');sel.innerHTML=Object.keys(masterData.areas).map(a=>`<option value="${a}">${a}</option>`).join('');showModal('addHotelModal');}
+function addHotel(){const name=document.getElementById('newHotelName').value.trim();if(!name){alert('物件名を入力してください');return;}const area=document.getElementById('newHotelArea').value;const ad=masterData.areas[area]||{};if(!masterData.hotels)masterData.hotels=[];masterData.hotels.push({name,area,default_rooms:0,time_per_room:0,color:ad.color||'#666',bg:ad.bg||'#eee',rooms:[]});saveMaster();closeModal('addHotelModal');renderHotelList();showMessage('物件を追加しました。「号室設定」から号室を登録してください。','success');}
+function showEditHotelModal(i){editingHotelIndex=i;const h=masterData.hotels[i];document.getElementById('editHotelName').value=h.name;document.getElementById('editHotelRooms').value=h.default_rooms;document.getElementById('editHotelTime').value=h.time_per_room;const sel=document.getElementById('editHotelArea');sel.innerHTML=Object.keys(masterData.areas).map(a=>`<option value="${a}"${a===h.area?' selected':''}>${a}</option>`).join('');showModal('editHotelModal');}
+function saveHotelEdit(){const name=document.getElementById('editHotelName').value.trim();if(!name){alert('物件名を入力してください');return;}const area=document.getElementById('editHotelArea').value;const ad=masterData.areas[area]||{};const h=masterData.hotels[editingHotelIndex];masterData.hotels[editingHotelIndex]={...h,name,area,color:ad.color||h.color||'#666',bg:ad.bg||h.bg||'#eee'};saveMaster();closeModal('editHotelModal');renderHotelList();showMessage('更新しました','success');}
+function resetHotelsToDefault(){
+  if(!confirm('物件データをExcelから読み込んだ初期データにリセットしますか？\n（現在の変更は失われます）'))return;
+  masterData.hotels = JSON.parse(JSON.stringify(DEFAULT_MASTER.hotels||[]));
+  saveMaster();
+  renderHotelList();
+  showMessage('物件データをリセットしました','success');
+}
+function resetStaffToDefault(){
+  if(!confirm('スタッフデータを初期データにリセットしますか？\n（チェッカー設定・行けるホテルの変更が全て元に戻ります）'))return;
+  masterData.staff = JSON.parse(JSON.stringify(DEFAULT_MASTER.staff));
+  saveMaster();
+  renderStaffList();
+  renderAreaSummary();
+  showMessage('スタッフデータをリセットしました','success');
+}
+
+function deleteHotel(i){
+  const h=masterData.hotels[i];
+  if(!h)return;
+  if(!confirm(h.name+' を削除しますか？'))return;
+  masterData.hotels.splice(i,1);
+  saveMaster();
+  renderHotelList();
+  showMessage('削除しました','success');
+}
+function showRoomListModal(i){
+  editingRoomHotelIndex=i;
+  const h=masterData.hotels[i];
+  if(!h)return;
+  const rooms=h.rooms||[];
+  const total=rooms.reduce((s,r)=>s+r.time,0);
+  const req=total>0?Math.ceil(total/300):0;
+  document.getElementById('roomListHotelLabel').innerHTML=
+    `<b>${h.name}</b>　${rooms.length}室　合計<b>${total}分</b>　全室→<b style="color:#1d4ed8;">${req}名</b>`;
+  document.getElementById('newRoomTime').value=60;
+  document.getElementById('newRoomNumber').value='';
+  renderRoomListTable();
+  showModal('roomListModal');
+}
+function renderRoomListTable(){
+  const h=masterData.hotels[editingRoomHotelIndex];
+  const rooms=h.rooms||[];
+  const t=document.getElementById('roomListTable');
+  if(!rooms.length){
+    t.innerHTML='<tr><td colspan="3" style="padding:24px;text-align:center;color:#9ca3af;font-size:13px;">号室が登録されていません<br>下のフォームから追加してください</td></tr>';
+    return;
+  }
+  let html=`<tr style="background:#f1f5f9;font-size:12px;font-weight:bold;">
+    <th style="padding:8px 10px;border:1px solid #e2e8f0;text-align:left;">号室番号</th>
+    <th style="padding:8px 10px;border:1px solid #e2e8f0;text-align:center;color:#1d4ed8;">清掃時間（分）</th>
+    <th style="padding:8px 10px;border:1px solid #e2e8f0;width:50px;"></th>
+  </tr>`;
+  rooms.forEach((r,i)=>{
+    html+=`<tr style="background:${i%2===0?'white':'#f8fafc'};">
+      <td style="padding:5px 8px;border:1px solid #e2e8f0;">
+        <input type="text" value="${r.room}" style="width:100%;padding:4px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:13px;font-weight:bold;"
+          onchange="updateRoomNumber(${i},this.value)">
+      </td>
+      <td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;">
+        <input type="number" value="${r.time}" min="1" max="999"
+          style="width:70px;padding:4px;border:2px solid #bfdbfe;border-radius:5px;background:#eff6ff;color:#1d4ed8;font-size:14px;font-weight:bold;text-align:center;"
+          onchange="updateRoomTime(${i},this.value)">
+      </td>
+      <td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center;">
+        <button style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;" onclick="deleteRoom(${i})">削除</button>
+      </td>
+    </tr>`;
+  });
+  const total=rooms.reduce((s,r)=>s+r.time,0);
+  const req=Math.ceil(total/300);
+  html+=`<tr style="background:#f0f9ff;font-weight:bold;">
+    <td style="padding:8px 10px;border:1px solid #e2e8f0;color:#374151;">合計 ${rooms.length}室</td>
+    <td style="padding:8px 10px;border:1px solid #e2e8f0;text-align:center;color:#1d4ed8;">${total}分</td>
+    <td style="padding:8px 10px;border:1px solid #e2e8f0;text-align:center;color:#0369a1;white-space:nowrap;">→ ${req}名</td>
+  </tr>`;
+  t.innerHTML=html;
+  // ヘッダーのラベルも更新
+  const hl=document.getElementById('roomListHotelLabel');
+  if(hl){const hh=masterData.hotels[editingRoomHotelIndex];hl.innerHTML=`<b>${hh.name}</b>　${rooms.length}室登録　合計<b>${total}分</b>　全室清掃時<b style="color:#1d4ed8;">${req}名</b>必要`;}
+}
+function addRoomToHotel(){const num=document.getElementById('newRoomNumber').value.trim();if(!num){alert('部屋番号を入力してください');return;}const time=parseInt(document.getElementById('newRoomTime').value)||60;const h=masterData.hotels[editingRoomHotelIndex];if(!h.rooms)h.rooms=[];h.rooms.push({room:num,time});h.default_rooms=h.rooms.length;h.time_per_room=Math.round(h.rooms.reduce((s,r)=>s+r.time,0)/h.rooms.length);saveMaster();renderRoomListTable();renderHotelList();document.getElementById('newRoomNumber').value='';showMessage('追加しました','success');}
+function updateRoomNumber(i,val){masterData.hotels[editingRoomHotelIndex].rooms[i].room=val;saveMaster();renderHotelList();}
+function updateRoomTime(i,val){const h=masterData.hotels[editingRoomHotelIndex];h.rooms[i].time=parseInt(val)||1;h.time_per_room=Math.round(h.rooms.reduce((s,r)=>s+r.time,0)/h.rooms.length);saveMaster();renderRoomListTable();renderHotelList();}
+function deleteRoom(i){if(!confirm('削除しますか？'))return;const h=masterData.hotels[editingRoomHotelIndex];h.rooms.splice(i,1);h.default_rooms=h.rooms.length;if(h.rooms.length)h.time_per_room=Math.round(h.rooms.reduce((s,r)=>s+r.time,0)/h.rooms.length);saveMaster();renderRoomListTable();renderHotelList();}
+function showSettingsHotel(){setTimeout(renderHotelList,50);}
+
+init();
+
+
+
+</script>
+</body>
+</html>
