@@ -41,6 +41,7 @@
 </div>
 <script>
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz7_29YMkw5_j9E5Tn4hGYYUcgowTsHd2SnZwl7KsP9g0M8PBtUbrXFjdYZR5j-aofo/exec';
+const APP_VERSION = '2026-03-12-v1';
 const DAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
 let finalizedData = null;
@@ -62,6 +63,11 @@ async function loadData() {
       finalizedData = JSON.parse(result.data);
       if (finalizedData.areas) areas = finalizedData.areas;
       if (finalizedData.holidays) holidays = finalizedData.holidays;
+      
+      // バージョンチェック
+      if (finalizedData.appVersion && finalizedData.appVersion !== APP_VERSION) {
+        document.getElementById('statusArea').innerHTML += '<div style="background:#dc2626;color:white;padding:10px;text-align:center;font-size:13px;font-weight:bold;border-radius:8px;margin:8px 16px;">⚠️ このページは古いバージョンです。管理者にお問い合わせください。</div>';
+      }
       
       const areaList = Object.keys(areas);
       if (areaList.length > 0 && !areaList.includes(currentArea)) {
