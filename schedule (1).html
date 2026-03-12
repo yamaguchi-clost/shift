@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>シフト確認</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Noto Sans JP', sans-serif; }
+    body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+    .card { background: white; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); overflow: hidden; max-width: 800px; margin: 0 auto; }
+    .area-tab { padding: 10px 16px; border-radius: 8px 8px 0 0; font-weight: 500; cursor: pointer; border: none; background: rgba(255,255,255,0.3); margin-right: 4px; color: white; font-size: 14px; }
+    .area-tab.active { background: white; color: #374151; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 8px; text-align: center; border-bottom: 1px solid #e5e7eb; }
+    th { background: #f8fafc; font-weight: 600; font-size: 13px; }
+    .staff-badge { padding: 4px 8px; border-radius: 6px; font-size: 12px; margin: 2px; display: inline-block; }
+    .holiday { background: #fef2f2; }
+    .holiday-text { color: #dc2626; font-weight: bold; }
+    .info-box { background: #f0fdf4; border: 1px solid #86efac; padding: 12px 16px; border-radius: 8px; margin: 16px; }
+    .warning-box { background: #fef3c7; border: 1px solid #fcd34d; padding: 12px 16px; border-radius: 8px; margin: 16px; }
+    .spinner { width: 40px; height: 40px; border: 4px solid #e5e7eb; border-top-color: #8b5cf6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div style="max-width: 800px; margin: 0 auto;">
+  <div style="text-align: center; margin-bottom: 16px; color: white;">
+    <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 4px;">📅 確定シフト</h1>
+    <p style="opacity: 0.9; font-size: 14px;">スタッフ用</p>
+  </div>
+  <div id="areaTabs" style="display: flex; flex-wrap: wrap; margin-bottom: -1px;"></div>
+  <div class="card">
+    <div id="statusArea"></div>
+    <div id="scheduleContent"></div>
+  </div>
+  <div style="text-align: center; margin-top: 16px;">
+    <button onclick="loadData()" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.5); padding: 10px 24px; border-radius: 8px; cursor: pointer; font-weight: 500;">🔄 最新に更新</button>
+  </div>
+</div>
+<script>
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz7_29YMkw5_j9E5Tn4hGYYUcgowTsHd2SnZwl7KsP9g0M8PBtUbrXFjdYZR5j-aofo/exec';
+const APP_VERSION = '2026-03-12-v1';
+const DAYS = ['日', '月', '火', '水', '木', '金', '土'];
+
+let finalizedData = null;
+let currentArea = '';
+let dates = [];
+let areas = {};
+let holidays = {};
+
+async function loadData() {
+  document.getElementById('statusArea').innerHTML = '';
+  document.getElementById('scheduleContent').innerHTML = '<div style="padding:60px 20px;text-align:center;"><div class="spinner"></div><p style="color:#6b7280;">読み込み中...</p></div>';
+  document.getElementById('areaTabs').innerHTML = '';
+  
+  try {
+    const response = await fetch(GOOGLE_SCRIPT_URL);
+    const result = await response.json();
+    
+    if (result.status === 'ok' && result.data) {
+      finalizedData = JSON.parse(result.data);
+      if (finalizedData.areas) areas = finalizedData.areas;
+      if (finalizedData.holidays) holidays = finalizedData.holidays;
+      
+      // バージョンチェック
+      if (finalizedData.appVersion && finalizedData.appVersion !== APP_VERSION) {
+        document.getElementById('statusArea').innerHTML += '<div style="background:#dc2626;color:white;padding:10px;text-align:center;font-size:13px;font-weight:bold;border-radius:8px;margin:8px 16px;">⚠️ このページは古いバージョンです。管理者にお問い合わせください。</div>';
+      }
+      
+      const areaList = Object.keys(areas);
+      if (areaList.length > 0 && !areaList.includes(currentArea)) {
+        currentArea = areaList[0];
+      }
+      generateDates();
+      render();
+    } else {
+      showNoData();
+    }
+  } catch (error) {
+    document.getElementById('scheduleContent').innerHTML = '<div class="warning-box"><div style="text-align:center;"><div style="font-size:24px;margin-bottom:8px;">⚠️</div><div style="font-weight:bold;color:#92400e;">読み込みエラー</div><div style="font-size:13px;color:#a16207;margin-top:4px;">更新ボタンを押してください</div></div></div>';
+  }
+}
+
+function showNoData() {
+  document.getElementById('statusArea').innerHTML = '';
+  document.getElementById('scheduleContent').innerHTML = '<div class="warning-box"><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:24px;">⏳</span><div><div style="font-weight:bold;color:#92400e;">シフトはまだ確定されていません</div><div style="font-size:13px;color:#a16207;">管理者がシフトを確定するまでお待ちください</div></div></div></div>';
+}
+
+function generateDates() {
+  dates = [];
+  if (finalizedData && finalizedData.startDate) {
+    const start = new Date(finalizedData.startDate);
+    const publishDates = finalizedData.publishDates || {};
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      // publishDatesに明示的にfalseが設定されている日は除外
+      if (publishDates[dateStr] !== false) {
+        dates.push(dateStr);
+      }
+    }
+  }
+}
+
+function isHoliday(date) {
+  const d = new Date(date);
+  return d.getDay() === 0 || holidays[date];
+}
+
+function render() {
+  renderAreaTabs();
+  renderStatus();
+  renderSchedule();
+}
+
+function renderAreaTabs() {
+  const c = document.getElementById('areaTabs');
+  c.innerHTML = '';
+  Object.entries(areas).forEach(([area, data]) => {
+    const btn = document.createElement('button');
+    btn.className = 'area-tab' + (area === currentArea ? ' active' : '');
+    btn.textContent = area.replace(' エリア', '');
+    btn.onclick = () => { currentArea = area; render(); };
+    c.appendChild(btn);
+  });
+}
+
+function renderStatus() {
+  const c = document.getElementById('statusArea');
+  if (!finalizedData || !finalizedData.finalizedAt) {
+    c.innerHTML = '';
+    return;
+  }
+  const date = new Date(finalizedData.finalizedAt);
+  const startDate = new Date(finalizedData.startDate);
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + 13);
+  const periodStr = (startDate.getMonth()+1) + '/' + startDate.getDate() + ' 〜 ' + (endDate.getMonth()+1) + '/' + endDate.getDate();
+  c.innerHTML = '<div class="info-box"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:24px;">✅</span><div><div style="font-weight:bold;color:#166534;">シフト確定済み</div><div style="font-size:13px;color:#15803d;">' + periodStr + '</div></div></div><div style="font-size:12px;color:#6b7280;">確定: ' + (date.getMonth()+1) + '/' + date.getDate() + ' ' + date.getHours() + ':' + String(date.getMinutes()).padStart(2,'0') + '</div></div></div>';
+}
+
+function renderSchedule() {
+  const c = document.getElementById('scheduleContent');
+  if (!finalizedData || !finalizedData.schedule || !dates.length) {
+    c.innerHTML = '<div style="padding:60px 20px;text-align:center;color:#9ca3af;"><div style="font-size:48px;margin-bottom:16px;">📭</div><div>表示するシフトがありません</div></div>';
+    return;
+  }
+  const schedule = finalizedData.schedule;
+  const hotelAssignment = finalizedData.hotelAssignment || {};
+  const areaData = areas[currentArea] || { color: '#666', bg: '#eee' };
+  const hasHotelData = dates.some(d => hotelAssignment[d]?.[currentArea] && Object.keys(hotelAssignment[d][currentArea]).length > 0);
+
+  let html = '<div style="overflow-x:auto;"><table><tr><th style="width:70px;">日付</th><th style="width:50px;">曜日</th><th>出勤スタッフ</th>';
+  if (hasHotelData) html += '<th style="min-width:200px;background:#fef9c3;">🏨 ホテル割り当て</th>';
+  html += '</tr>';
+
+  dates.forEach(date => {
+    const d = new Date(date);
+    const hol = isHoliday(date);
+    const assigned = schedule[date]?.[currentArea] || [];
+    const dayHotelAssign = hotelAssignment[date]?.[currentArea] || {};
+    html += '<tr class="' + (hol ? 'holiday' : '') + '">';
+    html += '<td style="font-weight:500;">' + (d.getMonth()+1) + '/' + d.getDate() + '</td>';
+    html += '<td class="' + (hol ? 'holiday-text' : '') + '">' + DAYS[d.getDay()] + (holidays[date] ? '㊗' : '') + '</td>';
+    html += '<td style="text-align:left;padding:8px 12px;">';
+    if (!assigned.length) {
+      html += '<span style="color:#9ca3af;font-size:13px;">−</span>';
+    } else {
+      assigned.forEach(name => {
+        html += '<span class="staff-badge" style="background:' + areaData.bg + ';color:' + areaData.color + ';">' + name + '</span>';
+      });
+    }
+    html += '</td>';
+
+    if (hasHotelData) {
+      html += '<td style="text-align:left;padding:6px 8px;background:#fffdf0;">';
+      const hotelKeys = Object.keys(dayHotelAssign);
+      if (!hotelKeys.length) {
+        html += '<span style="color:#9ca3af;font-size:12px;">未割り当て</span>';
+      } else {
+        hotelKeys.forEach(hotelName => {
+          const staffList = dayHotelAssign[hotelName] || [];
+          if (!staffList.length) return;
+          html += '<div style="margin-bottom:4px;"><span style="font-size:10px;font-weight:bold;color:#92400e;background:#fef3c7;padding:1px 5px;border-radius:4px;">' + hotelName + '</span> ';
+          staffList.forEach(name => {
+            var moves = (finalizedData.hashigoAssignment || {})[date];
+            moves = moves ? (moves[currentArea] || {})[name] || [] : [];
+            html += '<span style="font-size:12px;padding:2px 6px;background:#fff;border:1px solid #e2e8f0;border-radius:4px;margin:1px;display:inline-block;">' + name + '</span>';
+            if (moves.length > 0) {
+              html += '<span style="font-size:10px;color:#0369a1;margin-left:2px;">\u2192' + moves.join('\u2192') + '</span>';
+            }
+          });
+          html += '</div>';
+        });
+      }
+      html += '</td>';
+    }
+
+    html += '</tr>';
+  });
+  html += '</table></div>';
+  c.innerHTML = html;
+}
+
+loadData();
+</script>
+</body>
+</html>

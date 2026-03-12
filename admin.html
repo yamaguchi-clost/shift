@@ -468,6 +468,7 @@ const FINALIZED_STORAGE_KEY = 'hotel_shift_finalized';
 const MASTER_STORAGE_KEY = 'hotel_shift_master';
 const MASTER_VERSION_KEY = 'hotel_shift_master_version';
 const MASTER_VERSION = '2025-v5';  // ← バージョンを上げると次回起動時にDEFAULT_MASTERで上書きされる
+const APP_VERSION = '2026-03-12-v1'; // ← HTMLファイルのバージョン。更新時にここを変える
 const DAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const COLOR_MAP = {"#f59e0b":"#fef3c7","#3b82f6":"#dbeafe","#22c55e":"#dcfce7","#ec4899":"#fce7f3","#6366f1":"#e0e7ff","#14b8a6":"#ccfbf1"};
 
@@ -3482,6 +3483,24 @@ function init() {
   const areas = Object.keys(masterData.areas);
   if (areas.length) currentSubmissionArea = currentRoomsArea = currentScheduleArea = currentSettingsArea = currentSpecialTaskArea = areas[0];
   render();
+  checkAppVersion();
+}
+
+// アプリバージョンチェック（Google Sheetsの最新版と比較）
+async function checkAppVersion() {
+  try {
+    const res = await fetch(GOOGLE_SCRIPT_URL);
+    const result = await res.json();
+    if (result.status === 'ok' && result.data) {
+      const remote = JSON.parse(result.data);
+      if (remote.appVersion && remote.appVersion !== APP_VERSION) {
+        const msg = document.createElement('div');
+        msg.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#dc2626;color:white;padding:12px 16px;text-align:center;font-size:14px;font-weight:bold;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+        msg.innerHTML = '⚠️ このファイルは古いバージョンです（現在: ' + APP_VERSION + ' → 最新: ' + remote.appVersion + '）<br><span style="font-size:12px;font-weight:normal;">管理者から最新のHTMLファイルを受け取り、GitHubにアップし直してください</span>';
+        document.body.prepend(msg);
+      }
+    }
+  } catch(e) { /* オフライン時はスキップ */ }
 }
 
 // 開始日をGoogle Sheetsに反映（確定データの開始日だけ更新）
@@ -3494,6 +3513,7 @@ async function syncStartDateToSheet(newDate) {
       holidays: JSON.parse(JSON.stringify(masterData.holidays))
     };
     syncData.startDate = newDate;
+    syncData.appVersion = APP_VERSION;
     syncData.finalizedAt = syncData.finalizedAt || new Date().toISOString();
 
     await fetch(GOOGLE_SCRIPT_URL, {
@@ -3632,7 +3652,7 @@ async function finalizeSchedule() {
       }
     });
   });
-  finalizedData = { schedule: JSON.parse(JSON.stringify(adminData.generatedSchedule)), hotelAssignment: groupedHA, hashigoAssignment: JSON.parse(JSON.stringify(adminData.hashigoAssignment || {})), dailyRooms: JSON.parse(JSON.stringify(adminData.dailyRooms)), dailySpecialTasks: JSON.parse(JSON.stringify(adminData.dailySpecialTasks)), areas: JSON.parse(JSON.stringify(masterData.areas)), specialTasks: JSON.parse(JSON.stringify(masterData.specialTasks)), holidays: JSON.parse(JSON.stringify(masterData.holidays)), startDate: document.getElementById('startDate').value, finalizedAt: new Date().toISOString() }; localStorage.setItem(FINALIZED_STORAGE_KEY, JSON.stringify(finalizedData)); try { await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'finalize', scheduleData: JSON.stringify(finalizedData), timestamp: new Date().toISOString() }) }); showMessage('確定しました！スタッフが閲覧できます', 'success'); } catch (error) { showMessage('確定しました（オフライン）', 'success'); } closeModal('confirmModal'); renderFinalizeStatus();
+  finalizedData = { schedule: JSON.parse(JSON.stringify(adminData.generatedSchedule)), hotelAssignment: groupedHA, hashigoAssignment: JSON.parse(JSON.stringify(adminData.hashigoAssignment || {})), dailyRooms: JSON.parse(JSON.stringify(adminData.dailyRooms)), dailySpecialTasks: JSON.parse(JSON.stringify(adminData.dailySpecialTasks)), areas: JSON.parse(JSON.stringify(masterData.areas)), specialTasks: JSON.parse(JSON.stringify(masterData.specialTasks)), holidays: JSON.parse(JSON.stringify(masterData.holidays)), startDate: document.getElementById('startDate').value, finalizedAt: new Date().toISOString(), appVersion: APP_VERSION }; localStorage.setItem(FINALIZED_STORAGE_KEY, JSON.stringify(finalizedData)); try { await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'finalize', scheduleData: JSON.stringify(finalizedData), timestamp: new Date().toISOString() }) }); showMessage('確定しました！スタッフが閲覧できます', 'success'); } catch (error) { showMessage('確定しました（オフライン）', 'success'); } closeModal('confirmModal'); renderFinalizeStatus();
 }
 function renderFinalizeStatus() { const c = document.getElementById('finalizeStatus'); if (finalizedData?.finalizedAt) { const d = new Date(finalizedData.finalizedAt); c.innerHTML = `<span style="background:#dcfce7;color:#166534;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:bold;">✅ 確定済</span> <span style="color:#6b7280;font-size:13px;margin-left:8px;">最終: ${d.toLocaleDateString('ja-JP')} ${d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</span>`; } else { c.innerHTML = `<span style="background:#fef3c7;color:#92400e;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:bold;">⏳ 未確定</span>`; } }
 
@@ -3816,6 +3836,18 @@ function renderScheduleTable() {
       });
       html += '</div>';
     });
+    // 特別作業の割り当て表示
+    const daySpecial = (adminData.specialTaskAssignment || {})[date]?.[area] || {};
+    specialTasks.forEach(t => {
+      const staff = daySpecial[t.name] || [];
+      if (!staff.length) return;
+      hasAny = true;
+      html += `<div style="margin-bottom:3px;"><span style="font-size:10px;font-weight:bold;color:#166534;background:#dcfce7;padding:1px 5px;border-radius:4px;">🧹 ${t.name}</span> `;
+      staff.forEach(name => {
+        html += `<span style="font-size:11px;padding:2px 5px;background:#f0fdf4;border:1px solid #86efac;border-radius:4px;margin:1px;display:inline-block;">${name}</span>`;
+      });
+      html += '</div>';
+    });
     if (!hasAny) html += '<span style="color:#9ca3af;font-size:12px;">−</span>';
     html += `</td><td style="vertical-align:top;"><button class="btn-xs btn-blue" style="white-space:nowrap;" onclick="showEditShiftModal('${date}')">✏️</button></td></tr>`;
   });
@@ -3873,17 +3905,45 @@ function showEditShiftModal(date) {
   const schedule = adminData.generatedSchedule || {};
   const hotelAssign = adminData.generatedHotelAssignment || {};
   const surplus = adminData.generatedSurplusStaff || {};
+  const specialAssign = adminData.specialTaskAssignment || {};
   const assigned = schedule[date]?.[area] || [];
   const surplusList = surplus[date]?.[area] || [];
   const dayHotel = hotelAssign[date] || {};
   const areaHotels = (masterData.hotels || []).filter(h => h.area === area);
+  const specialTasks = masterData.specialTasks[area] || [];
   const areaData = masterData.areas[area] || { color: '#666', bg: '#eee' };
 
-  // スタッフごとのホテル割当を逆引き
-  const staffHotelMap = {};
+  // スタッフごとの割当先を逆引き（ホテル or 特別作業）
+  const staffAssignMap = {};
   areaHotels.forEach(h => {
-    (dayHotel[h.name] || []).forEach(name => { staffHotelMap[name] = h.name; });
+    (dayHotel[h.name] || []).forEach(name => { staffAssignMap[name] = h.name; });
   });
+  // 特別作業の逆引き
+  const daySpecial = specialAssign[date]?.[area] || {};
+  specialTasks.forEach(t => {
+    (daySpecial[t.name] || []).forEach(name => { staffAssignMap[name] = 'task:' + t.name; });
+  });
+
+  // プルダウン選択肢を生成するヘルパー
+  function assignOptions(currentVal) {
+    let opts = `<option value="">（未割当）</option>`;
+    // ホテル
+    if (areaHotels.length) {
+      opts += `<optgroup label="🏨 ホテル">`;
+      areaHotels.forEach(h => { opts += `<option value="${h.name}" ${currentVal===h.name?'selected':''}>${h.name}</option>`; });
+      opts += `</optgroup>`;
+    }
+    // 特別作業
+    if (specialTasks.length) {
+      opts += `<optgroup label="🧹 特別作業">`;
+      specialTasks.forEach(t => {
+        const val = 'task:' + t.name;
+        opts += `<option value="${val}" ${currentVal===val?'selected':''}>🧹 ${t.name}</option>`;
+      });
+      opts += `</optgroup>`;
+    }
+    return opts;
+  }
 
   let html = '';
 
@@ -3893,14 +3953,11 @@ function showEditShiftModal(date) {
     html += '<p style="color:#9ca3af;font-size:13px;padding:8px;">配置なし</p>';
   }
   assigned.forEach(name => {
-    const currentHotel = staffHotelMap[name] || '';
+    const currentVal = staffAssignMap[name] || '';
     html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:4px;flex-wrap:wrap;">`;
     html += `<span style="font-weight:bold;font-size:13px;min-width:100px;">${name}</span>`;
     html += `<select data-staff="${name}" data-type="hotel" style="flex:1;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;min-width:140px;">`;
-    html += `<option value="">（未割当）</option>`;
-    areaHotels.forEach(h => {
-      html += `<option value="${h.name}" ${currentHotel===h.name?'selected':''}>${h.name}</option>`;
-    });
+    html += assignOptions(currentVal);
     html += `</select>`;
     html += `<button class="btn-xs btn-red" onclick="removeFromShift('${date}','${name}')">除外</button>`;
     html += `</div>`;
@@ -3913,10 +3970,17 @@ function showEditShiftModal(date) {
       html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px dashed #fb923c;border-radius:8px;margin-bottom:4px;background:#fff7ed;flex-wrap:wrap;">`;
       html += `<span style="font-weight:bold;font-size:13px;min-width:100px;color:#ea580c;">${name}</span>`;
       html += `<select data-staff="${name}" data-type="surplus-hotel" style="flex:1;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;min-width:140px;">`;
-      html += `<option value="">（ホテル選択で配置）</option>`;
-      areaHotels.forEach(h => {
-        html += `<option value="${h.name}">${h.name}</option>`;
-      });
+      html += `<option value="">（選択で配置）</option>`;
+      if (areaHotels.length) {
+        html += `<optgroup label="🏨 ホテル">`;
+        areaHotels.forEach(h => { html += `<option value="${h.name}">${h.name}</option>`; });
+        html += `</optgroup>`;
+      }
+      if (specialTasks.length) {
+        html += `<optgroup label="🧹 特別作業">`;
+        specialTasks.forEach(t => { html += `<option value="task:${t.name}">🧹 ${t.name}</option>`; });
+        html += `</optgroup>`;
+      }
       html += `</select>`;
       html += `<button class="btn-xs btn-green" onclick="addSurplusToShift('${date}','${name}')">配置</button>`;
       html += `</div>`;
@@ -3974,23 +4038,32 @@ function saveShiftEdit() {
   const hotelAssign = adminData.generatedHotelAssignment;
   const assigned = schedule[date]?.[area] || [];
   const areaHotels = (masterData.hotels || []).filter(h => h.area === area);
+  const specialTasks = masterData.specialTasks[area] || [];
+
+  // 特別作業の割り当てデータ初期化
+  if (!adminData.specialTaskAssignment) adminData.specialTaskAssignment = {};
+  if (!adminData.specialTaskAssignment[date]) adminData.specialTaskAssignment[date] = {};
+  if (!adminData.specialTaskAssignment[date][area]) adminData.specialTaskAssignment[date][area] = {};
+  // 既存の特別作業割り当てをクリア
+  specialTasks.forEach(t => { adminData.specialTaskAssignment[date][area][t.name] = []; });
 
   // ホテル割り当て変更を反映
   const selects = document.querySelectorAll('#editShiftContent select[data-type="hotel"]');
   selects.forEach(sel => {
     const name = sel.dataset.staff;
-    const newHotel = sel.value;
-    // 既存割り当てから除去
+    const newVal = sel.value;
+    // 既存のホテル割り当てから除去
     areaHotels.forEach(h => {
       const arr = hotelAssign[date][h.name];
-      if (arr) {
-        const idx = arr.indexOf(name);
-        if (idx >= 0) arr.splice(idx, 1);
-      }
+      if (arr) { const idx = arr.indexOf(name); if (idx >= 0) arr.splice(idx, 1); }
     });
-    // 新しいホテルに配置
-    if (newHotel && hotelAssign[date][newHotel]) {
-      hotelAssign[date][newHotel].push(name);
+    // 特別作業 or ホテルに配置
+    if (newVal.startsWith('task:')) {
+      const taskName = newVal.slice(5);
+      if (!adminData.specialTaskAssignment[date][area][taskName]) adminData.specialTaskAssignment[date][area][taskName] = [];
+      adminData.specialTaskAssignment[date][area][taskName].push(name);
+    } else if (newVal && hotelAssign[date][newVal]) {
+      hotelAssign[date][newVal].push(name);
     }
   });
 
@@ -4012,6 +4085,14 @@ function removeFromShift(date, name) {
     const ha = hotelAssign[date]?.[h.name];
     if (ha) { const idx = ha.indexOf(name); if (idx >= 0) ha.splice(idx, 1); }
   });
+  // 特別作業割り当てからも除去
+  const daySpecial = adminData.specialTaskAssignment?.[date]?.[area];
+  if (daySpecial) {
+    Object.keys(daySpecial).forEach(taskName => {
+      const ta = daySpecial[taskName];
+      if (ta) { const idx = ta.indexOf(name); if (idx >= 0) ta.splice(idx, 1); }
+    });
+  }
   // 余剰に移動
   if (!adminData.generatedSurplusStaff) adminData.generatedSurplusStaff = {};
   if (!adminData.generatedSurplusStaff[date]) adminData.generatedSurplusStaff[date] = {};
@@ -4025,7 +4106,7 @@ function removeFromShift(date, name) {
 function addSurplusToShift(date, name) {
   const area = currentScheduleArea;
   const sel = document.querySelector(`#editShiftContent select[data-staff="${CSS.escape(name)}"][data-type="surplus-hotel"]`);
-  const hotelName = sel ? sel.value : '';
+  const val = sel ? sel.value : '';
   // 余剰から除去
   const sl = adminData.generatedSurplusStaff?.[date]?.[area];
   if (sl) { const idx = sl.indexOf(name); if (idx >= 0) sl.splice(idx, 1); }
@@ -4033,9 +4114,16 @@ function addSurplusToShift(date, name) {
   if (!adminData.generatedSchedule[date][area].includes(name)) {
     adminData.generatedSchedule[date][area].push(name);
   }
-  // ホテルに配置
-  if (hotelName && adminData.generatedHotelAssignment[date][hotelName]) {
-    adminData.generatedHotelAssignment[date][hotelName].push(name);
+  // 特別作業 or ホテルに配置
+  if (val.startsWith('task:')) {
+    const taskName = val.slice(5);
+    if (!adminData.specialTaskAssignment) adminData.specialTaskAssignment = {};
+    if (!adminData.specialTaskAssignment[date]) adminData.specialTaskAssignment[date] = {};
+    if (!adminData.specialTaskAssignment[date][area]) adminData.specialTaskAssignment[date][area] = {};
+    if (!adminData.specialTaskAssignment[date][area][taskName]) adminData.specialTaskAssignment[date][area][taskName] = [];
+    adminData.specialTaskAssignment[date][area][taskName].push(name);
+  } else if (val && adminData.generatedHotelAssignment[date][val]) {
+    adminData.generatedHotelAssignment[date][val].push(name);
   }
   saveAdmin();
   showEditShiftModal(date);
